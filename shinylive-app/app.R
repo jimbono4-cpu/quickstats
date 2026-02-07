@@ -55,7 +55,24 @@ ui <- fluidPage(
       h4("Benchmark Dataset"),
       p("A synthetic 5000-row dataset will be auto-generated for benchmarks."),
       hr(),
-      downloadButton("download_results", "Download Results (.md)")
+      actionButton("show_results", "Show Results as Markdown",
+                    class = "btn-default btn-block"),
+      tags$script(HTML("
+        Shiny.addCustomMessageHandler('downloadFile', function(msg) {
+          var blob = new Blob([msg.content], {type: 'text/markdown'});
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = msg.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+        Shiny.addCustomMessageHandler('updateTextarea', function(msg) {
+          document.getElementById('results_textarea').value = msg;
+        });
+      "))
     ),
 
     mainPanel(
@@ -80,6 +97,16 @@ ui <- fluidPage(
         tabPanel("Summary & Decision Matrix",
           div(class = "section-header", "Phase 0 Summary"),
           htmlOutput("summary_results")
+        ),
+        tabPanel("Export Results",
+          div(class = "section-header", "Markdown Results (copy or download)"),
+          p("Click 'Show Results as Markdown' in the sidebar, then copy the text below or click Download."),
+          actionButton("trigger_download", "Download as .md file",
+                        class = "btn-primary", style = "margin-bottom: 10px;"),
+          tags$textarea(id = "results_textarea", rows = 30,
+                        style = "width:100%; font-family:monospace; font-size:12px;",
+                        readonly = "readonly",
+                        "Run tests first, then click 'Show Results as Markdown'.")
         )
       )
     )
@@ -875,14 +902,23 @@ server <- function(input, output, session) {
     paste(lines, collapse = "\n")
   }
 
-  output$download_results <- downloadHandler(
-    filename = function() {
-      paste0("PHASE0_VALIDATION_", Sys.Date(), ".md")
-    },
-    content = function(file) {
-      writeLines(generate_markdown_results(), file)
-    }
-  )
+  # Show results in text area
+  observeEvent(input$show_results, {
+    md <- generate_markdown_results()
+    # Update the textarea via JS
+    session$sendCustomMessage("updateTextarea", md)
+    # Switch to the Export tab
+    updateTabsetPanel(session, "results_tabs", selected = "Export Results")
+  })
+
+  # Download via JS blob
+  observeEvent(input$trigger_download, {
+    md <- generate_markdown_results()
+    session$sendCustomMessage("downloadFile", list(
+      content = md,
+      filename = paste0("PHASE0_VALIDATION_", Sys.Date(), ".md")
+    ))
+  })
 }
 
 shinyApp(ui, server)
