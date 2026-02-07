@@ -1,6 +1,9 @@
 # Phase 0: WebR Package Validation Test App
 # This Shinylive app tests every planned package and runs smoke tests + benchmarks.
 # All results are displayed in-browser for manual recording.
+#
+# IMPORTANT: In WebR/Shinylive, packages must be explicitly installed before use.
+# This app uses webr::install() to download WASM binaries from the WebR repo.
 
 library(shiny)
 
@@ -25,13 +28,18 @@ ui <- fluidPage(
     }
     .benchmark-table th { background-color: #f8f9fa; }
     #copy_results { margin: 10px 0; }
+    .progress-msg {
+      color: #6c757d; font-style: italic; margin: 5px 0;
+    }
   ")),
 
   sidebarLayout(
     sidebarPanel(
       width = 3,
       h4("Test Controls"),
-      actionButton("run_load_tests", "1. Run Package Load Tests",
+      p(class = "mono", "Step 1: Install packages from WebR repo,
+         then load and test them."),
+      actionButton("run_load_tests", "1. Install & Load Packages",
                     class = "btn-primary btn-block"),
       br(), br(),
       actionButton("run_smoke_tests", "2. Run Smoke Tests",
@@ -45,11 +53,8 @@ ui <- fluidPage(
                     class = "btn-success btn-block"),
       hr(),
       h4("Benchmark Dataset"),
-      p("Upload a CSV (~1 MB, ~5000 rows, 20 cols) for benchmarking."),
-      fileInput("benchmark_file", "Upload CSV", accept = ".csv"),
-      p(class = "mono", textOutput("file_info")),
+      p("A synthetic 5000-row dataset will be auto-generated for benchmarks."),
       hr(),
-      actionButton("copy_results", "Copy Results as Markdown"),
       downloadButton("download_results", "Download Results (.md)")
     ),
 
@@ -58,7 +63,10 @@ ui <- fluidPage(
       tabsetPanel(
         id = "results_tabs",
         tabPanel("Package Load Tests",
-          div(class = "section-header", "Package Load Results"),
+          div(class = "section-header", "Package Install & Load Results"),
+          p(class = "progress-msg",
+            "Packages are downloaded as WASM binaries from the WebR repo.
+             This may take 30-60 seconds per package on first run."),
           htmlOutput("load_results")
         ),
         tabPanel("Smoke Tests",
@@ -89,11 +97,49 @@ server <- function(input, output, session) {
   )
 
   # ---------------------------------------------------------------------------
-  # Helper: try to load a package, record timing and success
+  # Helper: detect if running in WebR
+  # ---------------------------------------------------------------------------
+  is_webr <- function() {
+    Sys.getenv("WEBR") != "" ||
+      isTRUE(grepl("wasm", R.version$platform)) ||
+      exists("webr", mode = "environment")
+  }
+
+  # ---------------------------------------------------------------------------
+  # Helper: install a package (WebR-aware)
+  # ---------------------------------------------------------------------------
+  install_if_needed <- function(pkg_name) {
+    if (!requireNamespace(pkg_name, quietly = TRUE)) {
+      # Try webr::install first (works in Shinylive/WebR)
+      tryCatch({
+        if (is_webr() || exists("webr")) {
+          webr::install(pkg_name, quiet = TRUE)
+        } else {
+          # Standard R fallback
+          install.packages(pkg_name, repos = "https://cloud.r-project.org", quiet = TRUE)
+        }
+      }, error = function(e) {
+        # If webr::install doesn't exist, try the global install function
+        tryCatch({
+          # In some WebR builds, install is available directly
+          install.packages(pkg_name, quiet = TRUE)
+        }, error = function(e2) {
+          # Give up — will be caught by try_load_package
+          NULL
+        })
+      })
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Helper: try to install then load a package, record timing and success
   # ---------------------------------------------------------------------------
   try_load_package <- function(pkg_name) {
     start <- proc.time()["elapsed"]
     result <- tryCatch({
+      # Step 1: Install if not already available
+      install_if_needed(pkg_name)
+      # Step 2: Load
       library(pkg_name, character.only = TRUE)
       list(
         status = "loaded",
@@ -116,10 +162,10 @@ server <- function(input, output, session) {
   # ---------------------------------------------------------------------------
   # Helper: run a smoke test, record timing and success
   # ---------------------------------------------------------------------------
-  run_smoke_test <- function(test_name, test_expr) {
+  run_smoke_test <- function(test_name, test_fn) {
     start <- proc.time()["elapsed"]
     result <- tryCatch({
-      res <- eval(test_expr)
+      res <- test_fn()
       list(
         status = "pass",
         time = round(proc.time()["elapsed"] - start, 2),
@@ -182,10 +228,19 @@ server <- function(input, output, session) {
   output$load_results <- renderUI({
     results <- rv$load_results
     if (length(results) == 0) {
-      return(p("Click 'Run Package Load Tests' to begin."))
+      return(p("Click 'Install & Load Packages' to begin.",
+               br(),
+               "This will download WASM binaries from the WebR repo (may take several minutes)."))
     }
 
-    html_parts <- list()
+    loaded_count <- sum(sapply(results, function(x) x$status == "loaded"))
+    failed_count <- sum(sapply(results, function(x) x$status == "failed"))
+    summary_html <- sprintf(
+      '<div class="result-box" style="background-color:#e9ecef;"><strong>Summary: %d loaded, %d failed out of %d packages</strong></div>',
+      loaded_count, failed_count, length(results)
+    )
+
+    html_parts <- list(HTML(summary_html))
     for (tier_name in names(packages)) {
       tier_html <- sprintf('<div class="section-header" style="margin-top:20px;">%s</div>', tier_name)
       rows <- ""
@@ -214,53 +269,52 @@ server <- function(input, output, session) {
     # gt: render a small table as HTML
     results[["gt_render"]] <- run_smoke_test(
       "gt: Render mtcars as HTML table",
-      quote({
+      function() {
         if (requireNamespace("gt", quietly = TRUE)) {
           gt::gt(mtcars[1:5, ]) |> gt::as_raw_html()
         } else stop("gt not available")
-      })
+      }
     )
 
     # gtsummary: create Table 1
     results[["gtsummary_tbl"]] <- run_smoke_test(
       "gtsummary: tbl_summary on mtcars",
-      quote({
+      function() {
         if (requireNamespace("gtsummary", quietly = TRUE)) {
           gtsummary::tbl_summary(mtcars[, 1:4])
         } else stop("gtsummary not available")
-      })
+      }
     )
 
     # ggplot2: basic scatter plot
     results[["ggplot2_scatter"]] <- run_smoke_test(
       "ggplot2: Scatter plot (mpg vs hp)",
-      quote({
+      function() {
         if (requireNamespace("ggplot2", quietly = TRUE)) {
           p <- ggplot2::ggplot(mtcars, ggplot2::aes(mpg, hp)) +
             ggplot2::geom_point()
-          # Force rendering
           grDevices::png(tf <- tempfile(fileext = ".png"), width = 600, height = 400)
           print(p)
           grDevices::dev.off()
           file.exists(tf)
         } else stop("ggplot2 not available")
-      })
+      }
     )
 
     # broom: tidy a linear model
     results[["broom_tidy"]] <- run_smoke_test(
       "broom: Tidy lm(mpg ~ hp, mtcars)",
-      quote({
+      function() {
         if (requireNamespace("broom", quietly = TRUE)) {
           broom::tidy(lm(mpg ~ hp, data = mtcars))
         } else stop("broom not available")
-      })
+      }
     )
 
     # labelled: set and get labels
     results[["labelled_labels"]] <- run_smoke_test(
       "labelled: Set/get variable labels",
-      quote({
+      function() {
         if (requireNamespace("labelled", quietly = TRUE)) {
           df <- mtcars[, 1:3]
           labelled::var_label(df) <- list(mpg = "Miles per Gallon", cyl = "Cylinders", disp = "Displacement")
@@ -268,71 +322,71 @@ server <- function(input, output, session) {
           stopifnot(labels$mpg == "Miles per Gallon")
           labels
         } else stop("labelled not available")
-      })
+      }
     )
 
     # survival: survfit
     results[["survival_km"]] <- run_smoke_test(
       "survival: survfit(Surv(time, status) ~ x, aml)",
-      quote({
+      function() {
         if (requireNamespace("survival", quietly = TRUE)) {
           data(aml, package = "survival")
           survival::survfit(survival::Surv(time, status) ~ x, data = aml)
         } else stop("survival not available")
-      })
+      }
     )
 
     # sandwich: cluster-robust SEs
     results[["sandwich_vcov"]] <- run_smoke_test(
       "sandwich: vcovCL with clustering",
-      quote({
+      function() {
         if (requireNamespace("sandwich", quietly = TRUE)) {
           mod <- lm(mpg ~ hp, data = mtcars)
           sandwich::vcovCL(mod, cluster = mtcars$cyl)
         } else stop("sandwich not available")
-      })
+      }
     )
 
     # lmtest: coeftest with robust SEs
     results[["lmtest_coeftest"]] <- run_smoke_test(
       "lmtest: coeftest with sandwich vcov",
-      quote({
+      function() {
         if (requireNamespace("lmtest", quietly = TRUE) &&
             requireNamespace("sandwich", quietly = TRUE)) {
           mod <- lm(mpg ~ hp, data = mtcars)
           lmtest::coeftest(mod, vcov = sandwich::vcovCL(mod, cluster = mtcars$cyl))
         } else stop("lmtest or sandwich not available")
-      })
+      }
     )
 
     # car: VIF
     results[["car_vif"]] <- run_smoke_test(
       "car: VIF for multivariate model",
-      quote({
+      function() {
         if (requireNamespace("car", quietly = TRUE)) {
           mod <- lm(mpg ~ hp + wt + disp, data = mtcars)
           car::vif(mod)
         } else stop("car not available")
-      })
+      }
     )
 
     # emmeans: estimated marginal means
     results[["emmeans_test"]] <- run_smoke_test(
       "emmeans: Marginal means from ANOVA",
-      quote({
+      function() {
         if (requireNamespace("emmeans", quietly = TRUE)) {
           mtcars2 <- mtcars
           mtcars2$cyl <- factor(mtcars2$cyl)
           mod <- lm(mpg ~ cyl, data = mtcars2)
           emmeans::emmeans(mod, "cyl")
         } else stop("emmeans not available")
-      })
+      }
     )
 
-    # haven: read_dta (skip if no test file)
+    # haven: read_dta
     results[["haven_read"]] <- run_smoke_test(
       "haven: Create and read Stata file",
-      quote({
+      function() {
         if (requireNamespace("haven", quietly = TRUE)) {
           tf <- tempfile(fileext = ".dta")
           haven::write_dta(mtcars[1:10, ], tf)
@@ -340,36 +394,35 @@ server <- function(input, output, session) {
           stopifnot(nrow(df) == 10)
           df
         } else stop("haven not available")
-      })
+      }
     )
 
-    # readxl: read xlsx (skip if no test file)
+    # readxl: read xlsx
     results[["readxl_read"]] <- run_smoke_test(
       "readxl: Read built-in example xlsx",
-      quote({
+      function() {
         if (requireNamespace("readxl", quietly = TRUE)) {
-          # readxl ships with example files
           path <- readxl::readxl_example("datasets.xlsx")
           readxl::read_xlsx(path)
         } else stop("readxl not available")
-      })
+      }
     )
 
     # lme4: simple random intercept model
     results[["lme4_model"]] <- run_smoke_test(
       "lme4: lmer(Reaction ~ Days + (1|Subject), sleepstudy)",
-      quote({
+      function() {
         if (requireNamespace("lme4", quietly = TRUE)) {
           data(sleepstudy, package = "lme4")
           lme4::lmer(Reaction ~ Days + (1 | Subject), data = sleepstudy)
         } else stop("lme4 not available")
-      })
+      }
     )
 
     # ggdag: create and plot DAG
     results[["ggdag_dag"]] <- run_smoke_test(
       "ggdag: dagify(y ~ x) and ggdag()",
-      quote({
+      function() {
         if (requireNamespace("ggdag", quietly = TRUE)) {
           dag <- ggdag::dagify(y ~ x + z, x ~ z)
           p <- ggdag::ggdag(dag)
@@ -378,19 +431,19 @@ server <- function(input, output, session) {
           grDevices::dev.off()
           file.exists(tf)
         } else stop("ggdag not available")
-      })
+      }
     )
 
     # writexl: write xlsx
     results[["writexl_write"]] <- run_smoke_test(
       "writexl: write_xlsx(mtcars, ...)",
-      quote({
+      function() {
         if (requireNamespace("writexl", quietly = TRUE)) {
           tf <- tempfile(fileext = ".xlsx")
           writexl::write_xlsx(mtcars, tf)
           file.exists(tf) && file.size(tf) > 0
         } else stop("writexl not available")
-      })
+      }
     )
 
     rv$smoke_results <- results
@@ -402,7 +455,14 @@ server <- function(input, output, session) {
       return(p("Click 'Run Smoke Tests' to begin. (Run load tests first.)"))
     }
 
-    rows <- ""
+    pass_count <- sum(sapply(results, function(x) x$status == "pass"))
+    fail_count <- sum(sapply(results, function(x) x$status == "fail"))
+    summary_html <- sprintf(
+      '<div class="result-box" style="background-color:#e9ecef;"><strong>Summary: %d pass, %d fail out of %d tests</strong></div>',
+      pass_count, fail_count, length(results)
+    )
+
+    rows <- summary_html
     for (name in names(results)) {
       res <- results[[name]]
       err_msg <- if (!is.null(res$error)) sprintf(' — <span class="mono">%s</span>', res$error) else ""
@@ -416,80 +476,63 @@ server <- function(input, output, session) {
   })
 
   # ---------------------------------------------------------------------------
-  # BENCHMARK DATA HANDLING
-  # ---------------------------------------------------------------------------
-
-  observeEvent(input$benchmark_file, {
-    req(input$benchmark_file)
-    rv$benchmark_data <- read.csv(input$benchmark_file$datapath)
-  })
-
-  output$file_info <- renderText({
-    if (is.null(rv$benchmark_data)) {
-      "No benchmark file loaded. A default synthetic dataset will be generated."
-    } else {
-      d <- rv$benchmark_data
-      sprintf("%d rows x %d cols (%.1f KB)",
-              nrow(d), ncol(d),
-              file.size(input$benchmark_file$datapath) / 1024)
-    }
-  })
-
-  # ---------------------------------------------------------------------------
   # BENCHMARKS
   # ---------------------------------------------------------------------------
+
+  # Generate benchmark data once and store it
+  generate_benchmark_data <- function() {
+    set.seed(42)
+    n <- 5000
+    data.frame(
+      id = 1:n,
+      age = round(rnorm(n, 50, 15)),
+      sex = sample(c("Male", "Female"), n, replace = TRUE),
+      bmi = round(rnorm(n, 27, 5), 1),
+      smoking = sample(c("Never", "Former", "Current"), n, replace = TRUE),
+      bp_systolic = round(rnorm(n, 130, 20)),
+      bp_diastolic = round(rnorm(n, 80, 12)),
+      cholesterol = round(rnorm(n, 200, 40)),
+      glucose = round(rnorm(n, 100, 30)),
+      creatinine = round(rnorm(n, 1.0, 0.3), 2),
+      hemoglobin = round(rnorm(n, 14, 2), 1),
+      treatment = sample(c("Control", "Treatment"), n, replace = TRUE),
+      site = sample(paste0("Site_", 1:10), n, replace = TRUE),
+      outcome_continuous = round(rnorm(n, 50, 10), 1),
+      outcome_binary = sample(0:1, n, replace = TRUE, prob = c(0.7, 0.3)),
+      time_to_event = round(pmax(1, rexp(n, 0.02))),
+      event_status = sample(0:1, n, replace = TRUE, prob = c(0.4, 0.6)),
+      score1 = round(rnorm(n, 75, 12)),
+      score2 = round(rnorm(n, 80, 10)),
+      category = sample(LETTERS[1:8], n, replace = TRUE),
+      stringsAsFactors = FALSE
+    )
+  }
 
   observeEvent(input$run_benchmarks, {
     results <- list()
 
-    # Generate or use uploaded benchmark data
+    # Generate benchmark data
     if (is.null(rv$benchmark_data)) {
-      # Generate synthetic ~1MB dataset: 5000 rows, 20 columns
-      set.seed(42)
-      n <- 5000
-      bench_data <- data.frame(
-        id = 1:n,
-        age = round(rnorm(n, 50, 15)),
-        sex = sample(c("Male", "Female"), n, replace = TRUE),
-        bmi = round(rnorm(n, 27, 5), 1),
-        smoking = sample(c("Never", "Former", "Current"), n, replace = TRUE),
-        bp_systolic = round(rnorm(n, 130, 20)),
-        bp_diastolic = round(rnorm(n, 80, 12)),
-        cholesterol = round(rnorm(n, 200, 40)),
-        glucose = round(rnorm(n, 100, 30)),
-        creatinine = round(rnorm(n, 1.0, 0.3), 2),
-        hemoglobin = round(rnorm(n, 14, 2), 1),
-        treatment = sample(c("Control", "Treatment"), n, replace = TRUE),
-        site = sample(paste0("Site_", 1:10), n, replace = TRUE),
-        outcome_continuous = round(rnorm(n, 50, 10), 1),
-        outcome_binary = sample(0:1, n, replace = TRUE, prob = c(0.7, 0.3)),
-        time_to_event = round(rexp(n, 0.02)),
-        event_status = sample(0:1, n, replace = TRUE, prob = c(0.4, 0.6)),
-        score1 = round(rnorm(n, 75, 12)),
-        score2 = round(rnorm(n, 80, 10)),
-        category = sample(LETTERS[1:8], n, replace = TRUE)
-      )
-      rv$benchmark_data <- bench_data
+      rv$benchmark_data <- generate_benchmark_data()
     }
-
     d <- rv$benchmark_data
 
     # Benchmark 1: CSV upload and parse simulation
     results[["csv_parse"]] <- run_smoke_test(
       "CSV parse (write then read ~1MB)",
-      quote({
+      function() {
         tf <- tempfile(fileext = ".csv")
         write.csv(d, tf, row.names = FALSE)
         fsize <- file.size(tf)
         df <- read.csv(tf)
         list(rows = nrow(df), cols = ncol(df), file_kb = round(fsize / 1024))
-      })
+      }
     )
 
     # Benchmark 2: Descriptive statistics (Table 1)
     results[["table1_basic"]] <- run_smoke_test(
       "Table 1: gtsummary tbl_summary (basic, ~10 vars)",
-      quote({
+      function() {
         if (requireNamespace("gtsummary", quietly = TRUE)) {
           gtsummary::tbl_summary(
             d[, c("age", "sex", "bmi", "smoking", "bp_systolic",
@@ -497,56 +540,55 @@ server <- function(input, output, session) {
             by = "treatment"
           )
         } else stop("gtsummary not available")
-      })
+      }
     )
 
-    # Benchmark 3: Table 1 with all 20 variables (stress test)
+    # Benchmark 3: Table 1 with all variables (stress test)
     results[["table1_30var"]] <- run_smoke_test(
       "Table 1: gtsummary tbl_summary (all columns, stress test)",
-      quote({
+      function() {
         if (requireNamespace("gtsummary", quietly = TRUE)) {
-          # Exclude id and use all remaining columns
           cols <- setdiff(names(d), c("id", "treatment"))
           gtsummary::tbl_summary(d[, c(cols, "treatment")], by = "treatment")
         } else stop("gtsummary not available")
-      })
+      }
     )
 
     # Benchmark 4: High-cardinality categorical
     results[["table1_highcard"]] <- run_smoke_test(
       "Table 1: High-cardinality categorical (20+ levels)",
-      quote({
+      function() {
         if (requireNamespace("gtsummary", quietly = TRUE)) {
           d2 <- d
           d2$high_card <- sample(paste0("Level_", 1:25), nrow(d2), replace = TRUE)
           gtsummary::tbl_summary(d2[, c("high_card", "treatment")], by = "treatment")
         } else stop("gtsummary not available")
-      })
+      }
     )
 
     # Benchmark 5: Linear regression
     results[["lm_5pred"]] <- run_smoke_test(
       "Linear regression: lm with 5 predictors (n=5000)",
-      quote({
+      function() {
         mod <- lm(outcome_continuous ~ age + bmi + bp_systolic + cholesterol + glucose, data = d)
         if (requireNamespace("broom", quietly = TRUE)) broom::tidy(mod) else summary(mod)
-      })
+      }
     )
 
     # Benchmark 6: Logistic regression
     results[["glm_5pred"]] <- run_smoke_test(
       "Logistic regression: glm with 5 predictors (n=5000)",
-      quote({
+      function() {
         mod <- glm(outcome_binary ~ age + bmi + bp_systolic + cholesterol + glucose,
                     data = d, family = binomial)
         if (requireNamespace("broom", quietly = TRUE)) broom::tidy(mod) else summary(mod)
-      })
+      }
     )
 
     # Benchmark 7: Survival analysis (Cox model)
     results[["cox_model"]] <- run_smoke_test(
       "Cox regression: survival with 5 predictors (n=5000)",
-      quote({
+      function() {
         if (requireNamespace("survival", quietly = TRUE)) {
           mod <- survival::coxph(
             survival::Surv(time_to_event, event_status) ~ age + bmi + bp_systolic + treatment + sex,
@@ -554,35 +596,35 @@ server <- function(input, output, session) {
           )
           if (requireNamespace("broom", quietly = TRUE)) broom::tidy(mod) else summary(mod)
         } else stop("survival not available")
-      })
+      }
     )
 
     # Benchmark 8: Mixed model (if lme4 available)
     results[["mixed_model"]] <- run_smoke_test(
       "Mixed model: lmer with random intercept (n=5000, 10 sites)",
-      quote({
+      function() {
         if (requireNamespace("lme4", quietly = TRUE)) {
           lme4::lmer(outcome_continuous ~ age + bmi + treatment + (1 | site), data = d)
         } else stop("lme4 not available")
-      })
+      }
     )
 
     # Benchmark 9: Cluster-robust SEs
     results[["cluster_se"]] <- run_smoke_test(
       "Cluster-robust SEs: sandwich vcovCL (n=5000, 10 clusters)",
-      quote({
+      function() {
         if (requireNamespace("sandwich", quietly = TRUE) &&
             requireNamespace("lmtest", quietly = TRUE)) {
           mod <- lm(outcome_continuous ~ age + bmi + treatment, data = d)
           lmtest::coeftest(mod, vcov = sandwich::vcovCL(mod, cluster = d$site))
         } else stop("sandwich/lmtest not available")
-      })
+      }
     )
 
     # Benchmark 10: gt table rendering
     results[["gt_render_large"]] <- run_smoke_test(
       "gt: Render summary table as HTML (large)",
-      quote({
+      function() {
         if (requireNamespace("gt", quietly = TRUE) &&
             requireNamespace("gtsummary", quietly = TRUE)) {
           tbl <- gtsummary::tbl_summary(
@@ -592,13 +634,13 @@ server <- function(input, output, session) {
           gt_tbl <- gtsummary::as_gt(tbl)
           gt::as_raw_html(gt_tbl)
         } else stop("gt/gtsummary not available")
-      })
+      }
     )
 
     # Benchmark 11: Full ggplot2 with many points
     results[["ggplot_large"]] <- run_smoke_test(
       "ggplot2: Scatter with 5000 points + smoothing",
-      quote({
+      function() {
         if (requireNamespace("ggplot2", quietly = TRUE)) {
           p <- ggplot2::ggplot(d, ggplot2::aes(age, outcome_continuous, color = treatment)) +
             ggplot2::geom_point(alpha = 0.3) +
@@ -609,7 +651,7 @@ server <- function(input, output, session) {
           grDevices::dev.off()
           file.exists(tf)
         } else stop("ggplot2 not available")
-      })
+      }
     )
 
     rv$benchmark_results <- results
@@ -621,8 +663,15 @@ server <- function(input, output, session) {
       return(p("Click 'Run Benchmarks' to begin. (Run load tests first.)"))
     }
 
-    # Create a proper table
-    header <- '<table class="benchmark-table"><tr><th>Benchmark</th><th>Status</th><th>Time (s)</th><th>Notes</th></tr>'
+    pass_count <- sum(sapply(results, function(x) x$status == "pass"))
+    fail_count <- sum(sapply(results, function(x) x$status == "fail"))
+    summary_html <- sprintf(
+      '<div class="result-box" style="background-color:#e9ecef;"><strong>Summary: %d pass, %d fail out of %d benchmarks</strong></div>',
+      pass_count, fail_count, length(results)
+    )
+
+    header <- paste0(summary_html,
+      '<table class="benchmark-table"><tr><th>Benchmark</th><th>Status</th><th>Time (s)</th><th>Notes</th></tr>')
     rows <- ""
     for (name in names(results)) {
       res <- results[[name]]
@@ -641,13 +690,7 @@ server <- function(input, output, session) {
   # ---------------------------------------------------------------------------
 
   observeEvent(input$run_all, {
-    # Trigger all test suites sequentially
-    shinyjs_available <- requireNamespace("shinyjs", quietly = TRUE)
-
-    # Just click the buttons in sequence using updateActionButton workaround
-    # Actually, we'll just run all inline
-
-    # 1. Load tests
+    # 1. Load tests (run inline)
     results_load <- list()
     for (tier_name in names(packages)) {
       for (pkg in packages[[tier_name]]) {
@@ -658,9 +701,7 @@ server <- function(input, output, session) {
     }
     rv$load_results <- results_load
 
-    # 2. Smoke tests - trigger the observer
-    # We can't easily chain observers, so we'll inline the logic
-    # For simplicity, trigger the buttons
+    # Trigger smoke tests and benchmarks via button click simulation
     shiny::updateActionButton(session, "run_smoke_tests")
     shiny::updateActionButton(session, "run_benchmarks")
   })
@@ -678,18 +719,24 @@ server <- function(input, output, session) {
       return(p("Run all tests first to see the summary."))
     }
 
-    # Build decision matrix
     all_pkgs <- unlist(packages, use.names = FALSE)
+
+    loaded_count <- sum(sapply(load_res, function(x) x$status == "loaded"))
+    failed_count <- sum(sapply(load_res, function(x) x$status == "failed"))
+
+    summary_html <- sprintf(
+      '<div class="result-box" style="background-color:#e9ecef;"><strong>Overall: %d/%d packages loaded</strong></div>',
+      loaded_count, loaded_count + failed_count
+    )
 
     rows <- ""
     for (pkg in all_pkgs) {
       lr <- load_res[[pkg]]
       load_status <- if (!is.null(lr)) lr$status else "untested"
-      load_time <- if (!is.null(lr)) sprintf("%.2fs", lr$time) else "—"
-      version <- if (!is.null(lr) && !is.na(lr$version)) lr$version else "—"
-      tier <- if (!is.null(lr)) lr$tier else "—"
+      load_time <- if (!is.null(lr)) sprintf("%.2fs", lr$time) else "-"
+      version <- if (!is.null(lr) && !is.na(lr$version)) lr$version else "-"
+      tier <- if (!is.null(lr)) lr$tier else "-"
 
-      # Find related smoke tests
       smoke_pass <- 0
       smoke_fail <- 0
       for (sname in names(smoke_res)) {
@@ -699,14 +746,13 @@ server <- function(input, output, session) {
           else smoke_fail <- smoke_fail + 1
         }
       }
-      smoke_summary <- if (smoke_pass + smoke_fail == 0) "—"
+      smoke_summary <- if (smoke_pass + smoke_fail == 0) "-"
         else sprintf("%d/%d pass", smoke_pass, smoke_pass + smoke_fail)
 
-      # Decision
       decision <- if (load_status == "failed") {
-        '<span class="fail">EXCLUDE — use fallback</span>'
+        '<span class="fail">EXCLUDE - use fallback</span>'
       } else if (load_status == "loaded" && smoke_fail > 0) {
-        '<span class="warn">PARTIAL — document limitations</span>'
+        '<span class="warn">PARTIAL - document limitations</span>'
       } else if (load_status == "loaded") {
         '<span class="pass">INCLUDE in v1</span>'
       } else {
@@ -720,20 +766,25 @@ server <- function(input, output, session) {
     }
 
     HTML(paste0(
+      summary_html,
       '<table class="benchmark-table">',
       '<tr><th>Package</th><th>Load Status</th><th>Version</th><th>Load Time</th><th>Smoke Tests</th><th>Decision</th></tr>',
       rows,
       '</table>',
-      '<div style="margin-top:20px;"><h4>Fallback Decisions Required</h4>',
-      '<p>For each package marked EXCLUDE or PARTIAL, refer to the Fallback Table in the project spec:</p>',
+      '<div style="margin-top:20px;"><h4>Fallback Table</h4>',
+      '<p>For each package marked EXCLUDE or PARTIAL:</p>',
       '<ul>',
-      '<li><strong>haven</strong> → CSV-only input</li>',
-      '<li><strong>readxl</strong> → CSV-only input</li>',
-      '<li><strong>lme4</strong> → Drop mixed models</li>',
-      '<li><strong>ggdag</strong> → Pure ggplot2 DAG rendering</li>',
-      '<li><strong>writexl</strong> → CSV + HTML export</li>',
-      '<li><strong>car</strong> → Manual VIF/Levene implementation</li>',
-      '<li><strong>sandwich/lmtest</strong> → Note clustering, no SE adjustment</li>',
+      '<li><strong>gt</strong> - Use kableExtra or manual HTML tables</li>',
+      '<li><strong>gtsummary</strong> - Build Table 1 manually with base R</li>',
+      '<li><strong>labelled</strong> - Use base R attr() for variable labels</li>',
+      '<li><strong>car</strong> - Manual VIF/Levene implementation in base R</li>',
+      '<li><strong>emmeans</strong> - Manual marginal means calculation</li>',
+      '<li><strong>haven</strong> - CSV-only input</li>',
+      '<li><strong>readxl</strong> - CSV-only input</li>',
+      '<li><strong>lme4</strong> - Drop mixed models</li>',
+      '<li><strong>ggdag</strong> - Pure ggplot2 DAG rendering</li>',
+      '<li><strong>writexl</strong> - CSV + HTML export</li>',
+      '<li><strong>sandwich/lmtest</strong> - Note clustering, no SE adjustment</li>',
       '</ul></div>'
     ))
   })
@@ -764,11 +815,11 @@ server <- function(input, output, session) {
     for (pkg in all_pkgs) {
       lr <- load_res[[pkg]]
       if (is.null(lr)) {
-        lines <- c(lines, sprintf("| %s | — | untested | — | — | — |", pkg))
+        lines <- c(lines, sprintf("| %s | - | untested | - | - | - |", pkg))
       } else {
         status_emoji <- if (lr$status == "loaded") "\u2705" else "\u274C"
-        ver <- if (!is.na(lr$version)) lr$version else "—"
-        err <- if (!is.null(lr$error)) lr$error else "—"
+        ver <- if (!is.na(lr$version)) lr$version else "-"
+        err <- if (!is.null(lr$error)) lr$error else "-"
         lines <- c(lines, sprintf("| %s | %s | %s %s | %s | %.2f | %s |",
                                   pkg, lr$tier, status_emoji, lr$status, ver, lr$time, err))
       }
@@ -780,7 +831,7 @@ server <- function(input, output, session) {
     for (name in names(smoke_res)) {
       sr <- smoke_res[[name]]
       status_emoji <- if (sr$status == "pass") "\u2705" else "\u274C"
-      err <- if (!is.null(sr$error)) sr$error else "—"
+      err <- if (!is.null(sr$error)) sr$error else "-"
       lines <- c(lines, sprintf("| %s | %s %s | %.2f | %s |",
                                 sr$test, status_emoji, sr$status, sr$time, err))
     }
@@ -832,12 +883,6 @@ server <- function(input, output, session) {
       writeLines(generate_markdown_results(), file)
     }
   )
-
-  observeEvent(input$copy_results, {
-    md <- generate_markdown_results()
-    # Send to clipboard via JavaScript
-    session$sendCustomMessage("copyToClipboard", md)
-  })
 }
 
 shinyApp(ui, server)

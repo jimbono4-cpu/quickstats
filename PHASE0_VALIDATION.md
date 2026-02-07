@@ -134,41 +134,77 @@ _These tests require deploying the Shinylive test app and running manually in ea
 
 ---
 
-## WebR-Specific Validation (Browser Tests)
+## WebR/Shinylive Browser Validation (Run 1 — 2026-02-07)
 
-The standard R baseline above confirms all packages function correctly. The following browser-specific validation must be completed before proceeding to Phase 1:
+**Browser:** Windows laptop, R 4.5.2 (ucrt), WebR/Shinylive
+**Issue:** Initial test app did NOT auto-install packages via `webr::install()`. Packages that were not pre-bundled in the Shinylive runtime failed with "no package called X".
 
-### Test App Deployment
+### Browser Package Load Results
 
-The Shinylive test app (`shinylive-app/test_app.R`) packages all load tests, smoke tests, and benchmarks into an interactive browser application. To deploy:
+| Package | Tier | Browser Status | Version | Notes |
+|---------|------|---------------|---------|-------|
+| gt | Tier 1: Core | FAIL | — | Not pre-installed in WebR runtime |
+| gtsummary | Tier 1: Core | FAIL | — | Not pre-installed in WebR runtime |
+| ggplot2 | Tier 1: Core | PASS | 4.0.1 | Pre-installed |
+| broom | Tier 1: Core | PASS | 1.0.12 | Pre-installed |
+| labelled | Tier 1: Core | FAIL | — | Not pre-installed in WebR runtime |
+| survival | Tier 2: Analysis | PASS | 3.8.3 | Pre-installed |
+| sandwich | Tier 2: Analysis | PASS | 3.1.1 | Pre-installed |
+| lmtest | Tier 2: Analysis | PASS | 0.9.40 | Pre-installed |
+| car | Tier 2: Analysis | FAIL | — | Not pre-installed in WebR runtime |
+| emmeans | Tier 2: Analysis | FAIL | — | Not pre-installed in WebR runtime |
+| haven | Tier 3: File I/O | PASS | 2.5.5 | Pre-installed |
+| readxl | Tier 3: File I/O | PASS | 1.4.5 | Pre-installed |
+| lme4 | Tier 4: Advanced | PASS | 1.1.38 | Pre-installed |
+| ggdag | Tier 4: Advanced | FAIL | — | Expected — deep dependency chain |
+| writexl | Tier 4: Advanced | PASS | 1.5.4 | Pre-installed |
 
-1. Install the `shinylive` R package: `install.packages("shinylive")`
-2. Export: `shinylive::export("shinylive-app", "docs")`
-3. Serve locally: `httpuv::runStaticServer("docs")` or `python3 -m http.server --directory docs`
-4. Or deploy to GitHub Pages from the `docs/` directory
+**Browser result: 9/15 loaded, 6/15 failed**
+
+### Root Cause Analysis
+
+The Shinylive web component did NOT automatically detect and install packages from the WebR WASM repository. The initial `test_app.R` used `library()` directly without first calling `webr::install()`. Packages that happened to be bundled with the base Shinylive runtime loaded fine; others failed.
+
+### Fix Applied (v2 of test app)
+
+Updated `app.R` to:
+1. Detect WebR environment via `is_webr()` helper
+2. Call `webr::install(pkg, quiet = TRUE)` before `library()` for each package
+3. Fixed benchmark scoping bug: changed `quote({...})` to `function() {...}` closures so benchmark data `d` is properly captured
+4. Auto-generates 5000-row synthetic benchmark dataset (no file upload needed)
+
+### Pending: Browser Re-validation (Run 2)
+
+The updated test app must be re-run in the browser to determine which packages have WASM binaries in the WebR repo. Possible outcomes:
+
+| Package | Expected after fix | If still fails |
+|---------|-------------------|----------------|
+| gt | Likely PASS — available in WebR repo | Use manual HTML tables via `htmltools` |
+| gtsummary | Likely PASS — depends on gt, cards | Build Table 1 manually with base R |
+| labelled | Likely PASS — pure R, no compiled code | Use base R `attr()` for variable labels |
+| car | Likely PASS — available in WebR repo | Manual VIF implementation in base R |
+| emmeans | Likely PASS — available in WebR repo | Manual marginal means via `predict()` |
+| ggdag | Likely FAIL — deep dep chain | Use ggplot2 fallback (already decided) |
 
 ### Browser Test Checklist
 
-- [ ] Chrome (desktop): Run all 3 test suites, record timings
-- [ ] Firefox (desktop): Run all 3 test suites, record timings
-- [ ] Safari (Mac): Run all 3 test suites, record timings
-- [ ] Safari memory test: Run full workflow twice without page reload
-- [ ] Edge (desktop): Run all 3 test suites, record timings
-- [ ] Verify no network requests after initial WebR/package load (DevTools Network tab)
-- [ ] Record peak memory usage during benchmark suite (Chrome DevTools Performance tab)
-
-### WebR Package Availability Check
-
-Some packages that work in standard R may not have pre-compiled WASM binaries in the WebR repository. The test app will reveal this at load time. If any package fails to load in WebR:
-
-1. Check https://repo.r-wasm.org/ for the package
-2. If unavailable, activate the fallback from the Fallback Table
-3. Update this document with the WebR-specific results
+- [x] Chrome (desktop): Run 1 complete (9/15 loaded, benchmarks blocked by bugs)
+- [ ] Chrome (desktop): Run 2 with fixed test app (pending)
+- [ ] Firefox (desktop): Run all 3 test suites
+- [ ] Safari (Mac): Run all 3 test suites
+- [ ] Safari memory test: Run full workflow twice without reload
+- [ ] Edge (desktop): Run all 3 test suites
+- [ ] Verify no network requests after initial load (DevTools Network tab)
+- [ ] Record peak memory usage (Chrome DevTools Performance tab)
 
 ---
 
 ## Gate Decision
 
-**Standard R baseline: PASS (14/15 packages, all smoke tests, all benchmarks)**
+**Standard R baseline: PASS (14/15 packages, all smoke tests, all benchmarks <3s)**
 
-Proceed to Shinylive deployment of test app for browser validation. Phase 1 development may begin in parallel for components that do not depend on browser-specific results (module shell, state management, CSV parsing), but full Phase 1 completion requires browser validation to confirm the package list.
+**Browser Run 1: PARTIAL (9/15 loaded — test app bug, not WebR limitation)**
+
+The initial browser failure was caused by missing `webr::install()` calls, not by WebR package unavailability. The test app has been fixed. A second browser run is needed to confirm the true WebR package availability.
+
+**Action:** Re-run the updated test app in browser. If gt, gtsummary, labelled, car, and emmeans load after the fix, the gate is PASS and Phase 1 can proceed with the full confirmed package list. If any remain unavailable, activate their fallbacks per the table above.
