@@ -1,0 +1,501 @@
+"participant_id","age","sex","race","education","income","bmi","systolic_bp","diastolic_bp","heart_rate","cholesterol_total","hdl","ldl","triglycerides","fasting_glucose","hba1c","smoking_status","alcohol_use","physical_activity","diabetes_status"
+"S001",53,"Female","White","College",53031,NA,112,79,55,183,52,176,241,115,7.3,"Former","Moderate","Low",0
+"S002",44,"Female","White","College",48576,23.9,113,75,83,243,51,113,158,63,5.4,"Current","None","High",1
+"S003",53,"Female","White","High School",32719,27.2,107,75,83,254,61,178,205,157,6,"Former","Moderate","Sedentary",0
+"S004",46,"Female","White","High School",70061,21.7,138,63,62,282,63,96,79,64,6.7,"Former","None","Sedentary",0
+"S005",37,"Male","Other","High School",33826,25.3,110,72,55,231,76,96,184,130,7,"Never","Heavy","Sedentary",1
+"S006",45,"Male","Black","Graduate",124641,29.3,117,67,67,214,63,75,128,64,5.8,"Current","Moderate","Moderate",0
+"S007",43,"Female","White","College",55522,21.1,123,90,76,128,56,109,73,97,4.5,"Never","None","Moderate",0
+"S008",44,"Male","Hispanic","College",25557,31.6,109,73,92,233,44,128,200,130,4.6,"Current","Moderate","Moderate",0
+"S009",28,"Male","Hispanic","High School",24685,25.4,111,61,66,207,57,106,162,98,NA,"Never","Moderate","Sedentary",0
+"S010",49,"Female","White","Graduate",65650,22.9,150,96,88,151,59,149,79,98,7.4,"Former","None","Low",1
+"S011",61,"Female","White","College",49014,23,124,85,52,191,34,112,92,135,6.6,"Never","Moderate","High",0
+"S012",33,"Female","White","College",18633,28.3,133,78,71,243,63,143,136,110,6.4,"Never","Moderate","High",0
+"S013",41,"Female","White","Graduate",70222,34.1,123,75,73,258,21,160,206,119,4.5,"Former","Moderate","High",0
+"S014",17,"Male","Black","High School",25108,17.8,139,74,58,246,61,110,258,130,NA,"Never","Heavy","Moderate",0
+"S015",71,"Female","White","Graduate",42209,NA,126,84,86,146,40,140,247,99,5.7,"Never","Moderate","Low",0
+"S016",29,"Male","White","High School",61481,24.6,133,65,75,224,47,163,197,91,5.9,"Current","Moderate","Low",0
+"S017",51,"Female","Hispanic","College",77566,18.5,112,92,70,NA,71,124,182,85,NA,"Former","Moderate","Low",0
+"S018",39,"Male","White","College",73520,33.1,125,91,66,263,45,98,106,105,4.7,"Current","None","Low",0
+"S019",31,"Female","White","High School",93887,18.7,144,74,81,154,49,120,158,113,5.9,"Current","Moderate","Moderate",0
+"S020",51,"Male","White","Graduate",75481,25.1,104,51,55,204,60,150,234,83,4.1,"Current","Moderate","Moderate",0
+"S021",38,"Female","White","College",20484,24,142,89,76,162,45,80,113,84,6.3,"Current","Moderate","Moderate",0
+"S022",58,"Male","White","High School",115836,27.8,143,85,61,209,54,126,71,72,5.1,"Never","Heavy","High",0
+"S023",34,"Male","White","Graduate",44962,26.1,146,80,51,254,75,138,187,103,5.1,"Never","None","High",0
+"S024",47,"Female","Hispanic","College",57581,NA,129,69,69,260,46,92,146,76,NA,"Current","None","Sedentary",0
+"S025",47,"Male","White","College",37190,46.1,159,94,72,187,49,96,300,126,5.4,"Former","Moderate","Moderate",0
+"S026",53,"Male","White","High School",NA,25.3,118,99,85,204,64,103,460,87,5.8,"Current","Moderate","Moderate",0
+"S027",38,"Male","Asian","Graduate",64497,31.1,123,90,63,233,69,130,107,139,7,"Never","None","Moderate",0
+"S028",38,"Female","Black","College",23507,24.7,131,67,84,198,83,138,41,92,5.4,"Current","Moderate","Sedentary",0
+"S029",57,"Female","White","College",NA,27.9,106,93,91,255,37,100,95,58,5.5,"Former","Moderate","Low",0
+"S030",41,"Female","White","High School",50603,29.9,145,94,83,199,44,99,138,122,NA,"Current","None","Low",0
+"S031",71,"Female","White","College",44285,42,100,74,68,238,43,63,176,106,7.1,"Never","Moderate","Low",0
+"S032",38,"Female","Black","High School",169459,27.1,124,74,77,246,46,148,112,91,5.5,"Never","Heavy","High",0
+"S033",70,"Male","Asian","Graduate",69102,33.3,121,74,57,217,49,105,78,104,5.4,"Never","None","High",1
+"S034",24,"Female","White","High School",16200,31.6,113,88,90,163,50,121,139,112,NA,"Current","Moderate","Low",0
+"S035",68,"Male","Black","College",48569,33.9,158,84,79,200,54,105,283,113,6.1,"Never","None","Moderate",0
+"S036",46,"Female","Asian","College",44536,19.9,124,71,52,228,50,128,207,91,8,"Former","None","Sedentary",0
+"S037",40,"Male","White","College",51061,23,122,62,76,221,42,93,85,129,6.6,"Current","Heavy","Moderate",0
+"S038",35,"Male","Black","Graduate",85723,30.8,135,76,88,260,61,110,93,117,4.8,"Never","Moderate","Low",0
+"S039",60,"Male","White","College",97750,40.8,144,93,60,245,73,127,212,65,NA,"Former","Heavy","Low",0
+"S040",46,"Female","White","Graduate",70474,34.9,127,74,67,256,69,144,109,115,4.4,"Never","None","Moderate",0
+"S041",57,"Female","Black","College",60633,28.5,121,79,78,240,46,126,252,70,5.8,"Never","Moderate","Moderate",1
+"S042",38,"Male","White","High School",38377,10.5,112,75,88,233,55,179,84,97,5.3,"Never","Moderate","Sedentary",0
+"S043",19,"Female","White","High School",45794,30.7,110,78,61,187,83,33,180,64,5.5,"Former","Heavy","Moderate",0
+"S044",42,"Male","White","High School",44457,27.5,122,74,45,290,88,198,75,69,5.9,"Former","None","Sedentary",0
+"S045",48,"Male","Black","Graduate",54325,29.8,152,80,73,248,40,104,89,63,5.5,"Former","None","Sedentary",1
+"S046",41,"Female","Hispanic","College",302932,23.3,156,79,79,144,34,178,223,84,5.8,"Never","None","Sedentary",0
+"S047",34,"Female","Black","High School",51520,NA,164,91,52,163,80,41,207,87,6.3,"Never","Heavy","High",0
+"S048",57,"Female","Black","College",NA,24.9,120,56,56,190,43,139,163,120,5.6,"Current","Moderate","Sedentary",0
+"S049",39,"Male","Black","High School",91521,30,126,89,84,88,43,113,119,101,5.1,"Current","Moderate","Low",0
+"S050",45,"Female","White","Graduate",29921,23.7,142,100,61,215,39,108,299,92,5.7,"Current","Moderate","Moderate",0
+"S051",15,"Female","Black","College",53742,30.9,121,70,67,278,59,88,104,103,4.7,"Never","Heavy","Moderate",0
+"S052",54,"Female","Hispanic","College",116426,23.6,103,62,44,342,77,130,104,80,6.4,"Former","Moderate","Moderate",0
+"S053",53,"Female","Hispanic","High School",56614,32,133,80,88,131,44,150,100,68,5.9,"Never","Heavy","Moderate",0
+"S054",19,"Male","Other","High School",18830,24,113,67,83,193,45,139,222,90,6.6,"Former","Moderate","Sedentary",0
+"S055",23,"Female","Asian","High School",61984,42.5,128,60,77,143,34,157,118,159,5.1,"Former","None","Sedentary",1
+"S056",56,"Male","Black","High School",100990,28,143,70,62,256,40,86,166,91,5.9,"Never","None","High",0
+"S057",49,"Male","White","High School",NA,18.4,132,88,86,167,90,157,272,88,5.2,"Former","Moderate","Sedentary",0
+"S058",42,"Female","White","Graduate",NA,34.1,112,80,77,188,62,131,100,130,5.7,"Current","None","Sedentary",0
+"S059",45,"Male","Black","High School",36801,26.1,130,93,61,194,49,166,109,126,6,"Never","Heavy","Sedentary",0
+"S060",59,"Male","Asian","College",60154,16.8,110,74,57,165,17,126,176,49,NA,"Never","Moderate","Sedentary",1
+"S061",50,"Female","Other","College",33059,30,124,75,78,252,56,167,499,121,6.1,"Former","Moderate","Sedentary",0
+"S062",57,"Male","White","College",61842,29.6,133,83,71,221,46,101,275,125,5.6,"Current","Moderate","Moderate",0
+"S063",45,"Female","White","Graduate",30569,26.4,127,92,81,202,48,223,229,79,6.5,"Former","None","Low",0
+"S064",40,"Female","White","Graduate",39145,20.3,126,69,82,173,39,167,190,96,6.5,"Current","Moderate",NA,0
+"S065",55,"Female","Black","Graduate",NA,35.8,140,83,59,256,45,129,166,112,6,"Never","Moderate","Sedentary",0
+"S066",31,"Male","Black","Graduate",33368,24.9,135,100,52,232,68,170,91,72,6.2,"Former","Moderate","Sedentary",0
+"S067",46,"Female","Hispanic","Graduate",52419,20.6,134,72,73,100,50,88,181,77,5.5,"Current","None","Sedentary",0
+"S068",55,"Female","Asian","Graduate",59254,26.9,97,85,85,NA,77,149,107,137,3.7,"Current","Heavy","Moderate",0
+"S069",40,"Female","White","High School",34756,20.3,121,82,70,141,68,73,267,85,5.3,"Current","Moderate","Moderate",0
+"S070",53,"Female","Hispanic","College",53706,35.6,137,87,75,223,50,131,141,104,4.9,"Never","Moderate","Moderate",0
+"S071",62,"Female","White","Graduate",43049,NA,137,72,61,214,32,74,130,89,5,"Former","Moderate","Moderate",0
+"S072",51,"Female","Hispanic","Graduate",47316,20.9,139,72,70,216,51,104,55,114,5.3,"Never","None","Moderate",0
+"S073",65,"Male","Asian","High School",18810,30.8,117,68,45,295,37,89,87,81,6.4,"Current","Moderate","Moderate",0
+"S074",50,"Male","White","Graduate",36655,27.4,145,70,71,139,69,140,308,87,5.4,"Former","Moderate","Moderate",0
+"S075",57,"Male","Hispanic","College",127158,34.3,124,85,75,113,65,124,172,54,6.9,"Former","None","High",0
+"S076",46,"Male","Asian","Graduate",109861,30.1,141,75,74,253,72,127,144,62,5.4,"Current","Moderate","High",0
+"S077",56,"Male","Hispanic","High School",NA,NA,130,67,71,168,68,136,265,40,5.2,"Never","Heavy","Sedentary",0
+"S078",39,"Male","White","College",26018,24.4,141,78,68,196,36,149,121,90,5.1,"Never","Heavy","Low",0
+"S079",57,"Male","White","College",NA,31.9,107,75,80,225,36,147,334,77,6.4,"Former","None","Sedentary",1
+"S080",36,"Female","Asian","High School",18832,31.1,148,66,65,261,53,120,187,129,7,"Current","None","Moderate",1
+"S081",38,"Male","White","College",25272,26.4,158,84,78,160,57,89,107,119,7.1,"Never","Moderate","Moderate",0
+"S082",59,"Male","White","Graduate",NA,29.4,107,84,55,193,81,141,265,78,5.2,"Current","Moderate","High",0
+"S083",61,"Male","Asian","High School",16332,NA,153,52,82,169,50,83,63,80,5.9,"Former","Moderate","Low",0
+"S084",40,"Female","Black","High School",88364,26.1,100,81,67,195,48,30,53,144,6.2,"Former","Heavy","Sedentary",0
+"S085",39,"Male","Other","Graduate",33626,21.4,114,49,62,225,38,106,134,79,6.7,"Never","Heavy","Moderate",0
+"S086",42,"Male","Black","Graduate",140074,31.1,124,71,48,235,59,87,230,115,5.7,"Former","Heavy","Moderate",0
+"S087",43,"Male","Hispanic","High School",30738,37.4,116,90,73,226,45,122,378,96,NA,"Former","None","High",1
+"S088",56,"Female","White","High School",55751,30.1,124,91,79,236,59,186,173,89,5.2,"Former","Moderate","High",0
+"S089",39,"Male","Hispanic","High School",NA,28.5,112,81,78,220,66,163,130,102,5.2,"Former","None","High",0
+"S090",40,"Female","White","College",NA,23.2,137,93,48,273,63,218,134,132,5.9,"Former","Moderate","Low",0
+"S091",58,"Female","White","Graduate",260554,23.3,113,82,63,237,50,123,99,148,5.4,"Current","Moderate","High",0
+"S092",44,"Male","Asian","College",39490,26.1,108,78,73,149,41,135,69,75,5.1,"Current","None","Low",0
+"S093",43,"Male","Black","High School",39031,35.1,117,78,67,164,69,146,164,92,5.9,"Former","Moderate","Moderate",0
+"S094",51,"Female","Black","Graduate",76521,15.3,105,76,66,156,57,110,184,102,6.1,"Former","Moderate","Moderate",0
+"S095",54,"Female","White","College",83018,29.7,137,83,73,241,33,179,207,100,6.2,"Current","Moderate","High",0
+"S096",41,"Female","White","Graduate",38869,41.4,147,77,58,282,71,75,95,89,6.3,"Former","Heavy","Moderate",0
+"S097",39,"Male","White","High School",29637,NA,118,79,69,163,43,137,84,75,5.9,"Current","Moderate","Sedentary",0
+"S098",60,"Female","Hispanic","Graduate",41910,27.3,103,67,72,241,79,98,175,140,5.3,"Never","None","Low",0
+"S099",45,"Female","Black","Graduate",170190,17.6,136,92,70,219,46,185,259,90,5.7,"Current","Moderate","Low",0
+"S100",42,"Female","White","Graduate",53711,39.2,119,77,81,251,89,60,225,104,6.1,"Never","None","Sedentary",0
+"S101",39,"Female","White","College",91602,34.4,120,80,107,157,47,94,88,108,4.4,"Former","Moderate","Low",1
+"S102",49,"Female","White","College",72169,NA,113,85,81,196,82,81,116,85,5.5,"Current","Heavy","Low",0
+"S103",58,"Female","Other","College",56811,26.2,112,77,66,142,88,102,366,89,5,"Never","Moderate","Moderate",0
+"S104",55,"Female","Black","Graduate",38506,28.4,126,83,80,NA,53,139,123,68,6.2,"Never","Moderate","Low",0
+"S105",38,"Female","White","High School",70801,26.7,137,76,72,172,60,159,87,64,6.2,"Current","Heavy","High",1
+"S106",33,"Female","White","High School",52372,31.5,127,71,60,130,38,154,116,91,NA,"Former","Moderate","Moderate",0
+"S107",44,"Female","White","High School",82583,35.3,119,75,66,244,53,126,232,100,5.4,"Former","Moderate","Moderate",0
+"S108",29,"Male","Hispanic","High School",34311,28.3,115,103,69,NA,65,124,99,40,5,"Never","Heavy","Moderate",1
+"S109",45,"Male","White","College",118580,31.4,121,61,77,128,74,115,165,74,5.3,"Current","None","Moderate",0
+"S110",36,"Female","White","College",63575,29.2,119,81,62,227,49,115,221,74,6.1,"Never","Heavy","Sedentary",0
+"S111",46,"Male","Black","Graduate",53152,29.5,120,66,55,336,93,93,113,70,4.6,"Never","Moderate",NA,0
+"S112",57,"Male","Black","College",42525,24.7,105,76,65,116,10,84,250,95,4.9,"Former","Moderate","Low",0
+"S113",42,"Male","Other","College",51196,23.3,132,72,72,278,67,172,338,119,NA,"Current","None","Low",0
+"S114",33,"Male","White","College",58278,38.9,107,80,62,272,53,99,77,66,6.3,"Former","None","Low",0
+"S115",31,"Male","Hispanic","High School",31322,38.4,111,81,78,189,42,116,168,99,6,"Current","Heavy","Moderate",0
+"S116",35,"Female","Asian","College",95624,26,97,45,42,196,81,173,196,93,3.7,"Never","None","Low",0
+"S117",53,"Male","White","College",59474,23.1,119,75,41,193,54,82,151,69,5.7,"Former","Heavy","Sedentary",0
+"S118",58,"Female","Other","College",88937,29.2,107,90,72,157,60,150,346,123,5.7,"Former","None","High",0
+"S119",65,"Female","Black","High School",29523,NA,96,45,86,183,67,180,149,111,5.8,"Current","Heavy","Sedentary",0
+"S120",44,"Male","Black","College",80296,22.3,93,73,65,247,29,85,137,82,5.5,"Former","Moderate","Sedentary",0
+"S121",40,"Female","White","High School",80691,25.6,136,88,81,181,40,119,213,102,5.2,"Former","None","Moderate",0
+"S122",34,"Female","Asian","High School",75028,23.7,152,76,61,185,47,150,182,96,5.8,"Never","Moderate","Moderate",0
+"S123",46,"Male","White","Graduate",95491,31.7,109,75,81,193,70,126,109,116,6,"Current","None","Sedentary",0
+"S124",46,"Female","Asian","Graduate",49301,25.6,136,63,79,237,62,163,291,110,4.9,"Former","Moderate","Sedentary",0
+"S125",40,"Female","White","College",50507,26.9,142,71,88,155,67,103,118,83,7.6,"Never","Moderate","High",0
+"S126",36,"Female","White","Graduate",NA,31.5,159,73,56,258,58,131,147,92,6.3,"Never","None","Sedentary",0
+"S127",46,"Female","Asian","College",NA,NA,125,71,59,187,42,105,189,130,5.2,"Current","Moderate","High",0
+"S128",44,"Male","Black","College",26919,18.7,152,67,76,252,50,122,193,95,7.2,"Current","None","Low",0
+"S129",51,"Male","Black","High School",33826,31.3,143,70,68,226,66,221,108,131,4.9,"Former","None","Low",0
+"S130",31,"Male","Other","College",45853,17.7,94,69,77,178,44,162,85,85,5.3,"Never","Heavy","Sedentary",0
+"S131",49,"Female","Asian","College",39519,27,102,80,70,87,66,139,144,127,5,"Never","Moderate","Low",0
+"S132",66,"Female","Asian","College",49008,37.6,127,86,68,224,32,97,208,73,6.7,"Never","None","High",0
+"S133",66,"Female","Hispanic","College",22520,30.9,108,54,47,268,44,132,215,87,5.8,"Current","Moderate","Low",1
+"S134",52,"Female","Hispanic","College",32983,15.9,66,66,77,NA,49,124,108,119,6.1,"Never","None","High",0
+"S135",66,"Male","White","Graduate",20884,29,166,83,75,193,50,121,225,122,6.3,"Never","None","Sedentary",0
+"S136",23,"Female","White","College",38634,32.3,96,88,57,NA,62,103,102,62,4.8,"Never","Moderate","Low",0
+"S137",62,"Male","Hispanic","Graduate",13289,31.6,115,75,68,NA,72,120,61,77,5.3,"Current","None","High",0
+"S138",55,"Male","White","Graduate",59662,41.7,97,64,89,262,30,159,249,98,7.1,"Former","Heavy","High",0
+"S139",43,"Male","Asian","College",18777,25.5,143,78,88,274,63,157,216,79,NA,"Never","Heavy","Low",1
+"S140",50,"Female","White","Graduate",87350,29.4,114,67,66,273,45,64,395,128,4.9,"Former","Moderate","Low",0
+"S141",44,"Female","Black","College",36231,24.8,118,83,85,244,31,179,147,131,6.4,"Never","Heavy","Moderate",0
+"S142",62,"Male","Black","High School",19893,22.4,111,83,81,206,90,146,42,69,6.4,"Never","None","High",0
+"S143",27,"Male","Black","College",22672,30.7,148,79,73,200,79,129,168,47,6.3,"Never","None","High",0
+"S144",57,"Male","White","High School",58145,28.3,127,71,93,264,29,94,213,106,5.6,"Never","Heavy","Sedentary",0
+"S145",29,"Male","Hispanic","High School",NA,31.2,122,88,73,207,51,84,176,62,5.3,"Never","Moderate","Low",1
+"S146",50,"Male","White","High School",18694,30.9,89,51,61,268,50,109,158,98,4.6,"Former","Moderate","Low",1
+"S147",51,"Female","White","College",49042,26.4,100,68,79,149,65,108,53,78,NA,"Current","Moderate","Low",0
+"S148",35,"Female","Asian","Graduate",33649,23.4,141,51,86,235,59,88,256,121,5.4,"Former","Heavy","Low",0
+"S149",55,"Female","White","College",33855,24.7,131,76,73,220,70,152,116,106,5.5,"Never","Heavy","High",0
+"S150",32,"Female","White","High School",35729,30.4,92,68,73,140,83,110,154,76,7,"Former","Heavy","High",0
+"S151",38,"Male","White","Graduate",76000,31.7,118,95,75,206,70,85,349,89,7.2,"Former","Moderate","Low",0
+"S152",37,"Female","Black","High School",41613,32.3,111,73,61,179,44,209,246,76,5.3,"Current","Moderate","High",0
+"S153",61,"Male","White","College",41088,31.3,98,84,69,173,55,95,116,109,5.7,"Current","Moderate","Low",0
+"S154",32,"Male","Black","College",NA,26.8,115,70,88,140,41,116,80,106,5.9,"Never","Moderate","Low",1
+"S155",58,"Female","White","High School",51252,23,137,65,79,NA,42,66,131,118,NA,"Former","Moderate","High",0
+"S156",30,"Male","White","High School",NA,30,120,76,56,259,30,114,318,109,NA,"Former","Heavy","Sedentary",0
+"S157",39,"Female","White","Graduate",48247,28.2,154,88,77,228,44,157,68,87,7.6,"Former","Heavy","Sedentary",0
+"S158",30,"Female","Asian","Graduate",70786,29.9,158,100,72,135,64,112,370,95,6.4,"Former","Heavy","High",1
+"S159",41,"Female","White","High School",40807,24.3,126,80,66,174,79,137,166,84,NA,"Former","Moderate","Low",0
+"S160",70,"Male","Black","High School",39019,28.9,103,78,60,169,56,125,59,63,5.9,"Current","Heavy","High",0
+"S161",39,"Female","White","College",29017,26.2,92,75,77,278,41,158,249,116,5.3,"Former","None","Moderate",0
+"S162",62,"Female","Hispanic","High School",45530,25.4,113,70,69,209,42,107,141,94,5.8,"Former","Moderate","Low",0
+"S163",43,"Male","White","College",41254,30.3,136,88,54,159,59,210,110,93,4.5,"Former","Moderate","Moderate",0
+"S164",44,"Male","White","High School",55212,32.2,83,67,72,155,51,159,223,110,5.7,"Former","Heavy","High",1
+"S165",45,"Male","White","High School",54252,28,105,78,71,234,32,100,129,136,NA,"Former","Moderate","Low",0
+"S166",26,"Male","Hispanic","High School",65573,NA,106,85,70,162,82,95,184,59,5.4,"Former","Moderate","High",0
+"S167",42,"Male","Black","High School",53649,38.8,108,82,90,283,49,75,65,91,5.8,"Current","Moderate","Moderate",1
+"S168",38,"Female","White","College",24381,38.9,129,91,81,211,37,95,133,115,5.2,"Current","Heavy","Moderate",0
+"S169",52,"Female","Other","College",57845,22.2,129,66,63,247,53,155,84,43,5.6,"Current","Moderate","Low",0
+"S170",35,"Female","White","High School",48234,32.7,134,84,74,224,64,122,179,106,4.8,"Former","Heavy","Sedentary",0
+"S171",44,"Female","Asian","Graduate",96870,20.2,142,86,91,183,36,52,325,110,7,"Never","Moderate","Moderate",0
+"S172",19,"Male","White","College",17409,31.3,152,65,64,172,55,121,142,78,6.4,"Current","Moderate","High",0
+"S173",65,"Female","Hispanic","High School",86377,14.4,110,70,88,188,61,166,130,80,5.2,"Current","None","High",0
+"S174",44,"Female","White","High School",52483,30.6,95,90,65,168,61,123,313,69,5.8,"Current","Moderate","Moderate",0
+"S175",37,"Male","Black","Graduate",89656,28.8,83,81,71,231,40,143,142,111,5.1,"Current","None","Low",1
+"S176",30,"Male","White","College",34706,27.2,142,83,72,206,73,177,445,89,5.3,"Current","None","Sedentary",0
+"S177",49,"Male","White","College",56516,26.8,156,78,52,208,91,141,106,76,6.4,"Current","None","Low",0
+"S178",55,"Male","Hispanic","Graduate",22506,28.8,135,70,68,192,63,126,127,80,5.6,"Never","Moderate","Moderate",0
+"S179",35,"Female","White","Graduate",26097,30.2,119,67,64,295,41,102,195,67,5.7,"Former","Moderate","Moderate",0
+"S180",41,"Female","Black","College",114830,34,113,64,54,249,41,152,160,109,6.1,"Former","Heavy","Moderate",0
+"S181",32,"Male","White","High School",119655,26.8,139,102,81,172,43,131,128,144,5.6,"Former","None","Moderate",1
+"S182",51,"Male","White","Graduate",36522,22.6,138,80,88,190,52,84,133,84,7.1,"Former","Moderate","Low",0
+"S183",52,"Female","Hispanic","College",159044,23.8,133,77,50,212,53,164,113,121,5.2,"Former","Moderate","Moderate",0
+"S184",60,"Female","White","College",28000,27.8,125,97,65,142,74,138,239,113,6.4,"Current","Moderate","Moderate",0
+"S185",55,"Female","White","High School",53976,25.2,140,92,62,214,25,192,146,111,5.4,"Never","None","Sedentary",0
+"S186",47,"Male","White","Graduate",90594,24.9,103,66,88,214,77,174,114,116,5.6,"Never","None",NA,0
+"S187",41,"Female","White","Graduate",28423,22,121,90,59,263,50,95,141,122,6.1,"Current","Moderate","Low",0
+"S188",55,"Male","White","Graduate",36910,28.3,122,78,69,185,76,123,221,75,6,"Current","Moderate","Moderate",0
+"S189",55,"Male","Hispanic","Graduate",149068,NA,140,85,94,279,51,177,108,112,7,"Current","Moderate","High",0
+"S190",55,"Female","Black","Graduate",36767,28.8,134,70,81,258,43,172,107,85,6.1,"Never","Heavy","Sedentary",0
+"S191",45,"Female","White","College",45380,23.2,145,84,82,196,60,178,101,80,4.8,"Former","Moderate","Low",0
+"S192",45,"Male","Asian","College",118891,20.1,87,59,95,276,36,72,155,68,6.2,"Former","None","Sedentary",0
+"S193",65,"Female","Black","Graduate",45818,30,125,89,81,175,61,108,49,110,5.4,"Current","Heavy","Low",0
+"S194",53,"Female","White","Graduate",71089,35.9,89,69,71,247,43,119,257,130,5.1,"Never","Moderate","Moderate",0
+"S195",51,"Female","Other","Graduate",32832,20.8,124,81,73,190,63,171,87,61,4.5,"Never","Moderate","High",0
+"S196",75,"Male","White","Graduate",91703,27.8,113,76,56,241,64,141,272,88,5.7,"Current","None","Moderate",1
+"S197",61,"Male","White","High School",NA,26.3,129,77,70,196,72,158,84,75,7.7,"Former","Moderate","High",0
+"S198",44,"Female","White","Graduate",15136,43.1,147,62,72,153,22,114,141,117,4.8,"Current","Moderate","Moderate",0
+"S199",58,"Female","Asian","High School",22088,30,101,93,64,251,50,145,201,97,5.7,"Former","None","Low",0
+"S200",42,"Male","White","High School",95135,27.4,104,78,61,154,55,105,190,52,5.7,"Current","Moderate","Low",0
+"S201",53,"Male","White","College",42680,25.1,118,76,57,251,31,99,89,85,5.8,"Current","None","Low",0
+"S202",56,"Female","White","College",69760,28.2,124,79,89,91,72,113,68,91,4.3,"Former","Moderate","Low",0
+"S203",59,"Female","Hispanic","Graduate",50262,16.1,119,82,58,301,46,136,160,117,6.9,"Former","Moderate","Sedentary",0
+"S204",62,"Female","Black","High School",105160,26.1,105,76,63,255,72,55,195,55,5.2,"Current","None","Sedentary",0
+"S205",52,"Female","White","College",9945,33.1,110,72,86,NA,68,144,182,102,4.7,"Former","Moderate","Sedentary",0
+"S206",39,"Female","White","High School",18013,29.2,137,74,75,162,43,95,201,107,4.4,"Never","Heavy","Sedentary",1
+"S207",23,"Female","White","Graduate",41036,25.7,115,82,48,183,57,202,218,106,4.9,"Former","Moderate","Low",0
+"S208",26,"Female","White","High School",36540,29.7,120,81,59,218,13,103,39,131,5,"Never","Moderate","Low",0
+"S209",32,"Female","Black","Graduate",66078,20.2,91,71,79,301,60,165,251,99,5,"Never","Moderate","Sedentary",1
+"S210",67,"Male","White","College",16839,22.5,104,82,72,195,54,93,347,88,5.4,"Never","None","Low",0
+"S211",35,"Male","White","High School",174467,23.1,120,90,88,183,58,126,202,84,5.6,"Never","Moderate","Moderate",0
+"S212",16,"Female","White","College",47020,12.5,127,71,64,241,58,110,124,69,5.3,"Former","Heavy","Low",0
+"S213",47,"Male","Hispanic","College",56723,29.3,108,78,65,182,56,132,277,122,6.8,"Former","None","High",0
+"S214",38,"Female","Hispanic","Graduate",92353,23,127,75,68,211,64,74,163,62,5.4,"Current","Moderate","Sedentary",0
+"S215",49,"Female","Hispanic","High School",25787,25.1,143,95,86,157,25,105,353,89,6.5,"Former","Moderate","Sedentary",1
+"S216",43,"Female","Hispanic","High School",53522,30.6,149,76,90,151,70,171,229,71,5.7,"Never","Moderate","Sedentary",0
+"S217",33,"Female","Hispanic","Graduate",24893,29.3,124,75,80,264,39,152,259,156,5.5,"Never","Moderate","Sedentary",1
+"S218",41,"Male","White","College",39438,30.3,152,64,65,185,51,97,157,96,5.2,"Former","None","Moderate",0
+"S219",53,"Male","Black","High School",104833,20.3,128,72,75,243,49,111,145,101,5.8,"Current","Moderate","Low",0
+"S220",50,"Male","White","College",42884,26.7,165,79,87,318,37,71,154,111,6.8,"Current","None",NA,1
+"S221",47,"Male","Black","Graduate",194591,31.3,129,73,75,180,45,156,158,72,4.9,"Former","None","High",0
+"S222",31,"Male","White","College",16623,33.7,113,81,63,197,33,217,170,114,4.6,"Former","Moderate","Low",0
+"S223",40,"Male","Other","College",NA,27.4,155,77,101,198,29,121,148,93,5.5,"Former","None","Low",1
+"S224",48,"Female","White","Graduate",18086,33,151,86,82,189,70,118,222,97,6.4,"Current","Moderate","Sedentary",1
+"S225",32,"Female","White","High School",100013,23.7,119,94,68,240,54,105,247,50,6.7,"Never","Moderate","Sedentary",0
+"S226",50,"Male","White","College",49297,24.8,122,91,78,253,55,176,58,79,6.5,"Former","Moderate","High",1
+"S227",52,"Female","Other","High School",76179,21.9,111,72,57,NA,70,116,190,118,5.5,"Current","Moderate","High",0
+"S228",43,"Male","Other","Graduate",NA,33.2,116,73,59,222,65,120,171,66,5.2,"Former","Moderate","High",1
+"S229",52,"Male","White","High School",61814,NA,99,91,76,173,59,174,81,114,6.5,"Never","Moderate","High",0
+"S230",46,"Male","Black","Graduate",19964,23.5,163,63,85,232,84,239,91,84,4.1,"Former","None","Sedentary",0
+"S231",21,"Male","Black","College",97261,26.9,144,73,87,232,50,100,62,93,6,"Former","Heavy","Low",0
+"S232",34,"Male","White","Graduate",52794,16.4,126,79,82,246,45,167,90,90,6.1,"Never","Moderate","Low",0
+"S233",32,"Male","Black","High School",NA,33.4,120,77,95,192,81,120,146,126,5.6,"Current","Moderate","Sedentary",0
+"S234",51,"Female","Other","High School",45405,24.1,112,65,62,181,31,61,60,104,4.7,"Former","Heavy",NA,0
+"S235",52,"Female","White","High School",79712,30.7,124,60,66,175,67,105,217,139,5.5,"Former","Heavy","Moderate",1
+"S236",26,"Female","White","High School",112803,34.5,128,65,71,309,57,145,125,138,6.7,"Never","None","Sedentary",0
+"S237",51,"Female","Black","Graduate",NA,26.4,144,87,77,253,67,169,189,70,5.3,"Never","Heavy","Moderate",0
+"S238",57,"Male","Asian","High School",102122,26,113,66,69,141,67,104,273,88,5.1,"Current","Moderate","Sedentary",0
+"S239",62,"Male","Black","College",57924,26.3,145,92,61,176,19,123,285,115,5.6,"Never","Moderate","Moderate",0
+"S240",39,"Male","White","High School",79665,32,122,75,76,279,69,92,261,118,5.3,"Former","Heavy","Moderate",0
+"S241",63,"Female","White","College",160417,23.8,127,65,65,180,67,150,128,69,6.2,"Former","None","Low",0
+"S242",54,"Male","White","College",87577,22.3,116,57,63,193,70,142,154,123,5,"Current","None","Moderate",0
+"S243",46,"Male","White","High School",38956,19,141,98,65,156,36,100,138,97,6.3,"Former","None","Low",1
+"S244",35,"Female","Asian","High School",57055,33.4,122,82,85,300,59,83,130,70,5.7,"Current","Heavy","Low",1
+"S245",46,"Male","Black","High School",82217,23.2,95,78,73,120,78,131,79,88,5.2,"Current","Moderate","High",0
+"S246",67,"Male","White","College",32073,16.7,149,95,67,203,63,122,148,111,5.8,"Current","None","High",0
+"S247",42,"Male","Black","College",223064,24.2,115,62,76,222,66,131,121,74,4.8,"Current","Heavy","High",0
+"S248",28,"Female","Other","College",NA,37.6,127,86,68,154,52,67,157,90,5.3,"Never","Moderate","Sedentary",1
+"S249",44,"Female","White","High School",NA,22.9,147,79,69,172,63,136,202,90,NA,"Never","Moderate","High",0
+"S250",35,"Male","Other","College",37705,24.7,132,62,68,234,39,148,215,108,6.6,"Current","Moderate","High",0
+"S251",74,"Female","White","College",45134,29.9,150,53,68,213,37,83,83,81,5.6,"Current","Moderate","Moderate",0
+"S252",48,"Male","White","College",58430,25.5,120,87,71,300,34,79,219,88,6.1,"Current","Moderate","High",1
+"S253",31,"Female","White","Graduate",67710,27.3,143,69,40,173,39,133,95,111,5.3,"Former","None","Moderate",0
+"S254",46,"Female","White","Graduate",32166,32.2,96,76,81,224,40,181,175,130,5.7,"Current","None","Low",0
+"S255",34,"Female","White","College",70724,23.2,123,86,54,224,52,103,333,133,5.2,"Former","Moderate","Sedentary",0
+"S256",64,"Male","Hispanic","Graduate",76111,33.2,153,72,64,233,45,185,118,140,6.2,"Never","Moderate","Low",0
+"S257",45,"Female","Hispanic","College",58151,33.6,112,79,77,141,61,142,110,118,6.1,"Never","Heavy","Low",0
+"S258",41,"Female","Hispanic","High School",101800,35.3,140,66,57,303,63,155,172,99,7.2,"Former","Heavy","High",0
+"S259",41,"Female","White","Graduate",31227,34.7,108,66,54,227,62,129,148,115,6.4,"Current","None","High",0
+"S260",45,"Female","White","Graduate",35677,26.9,116,97,74,289,60,125,178,131,6,"Current","Moderate","Low",0
+"S261",42,"Male","White","High School",27784,21,159,52,64,155,67,150,126,68,5.3,"Current","None","Low",0
+"S262",44,"Male","White","High School",40072,33,145,77,74,136,36,127,245,76,5.1,"Current","Moderate","High",0
+"S263",39,"Male","White","High School",205958,24.4,148,53,63,244,57,155,97,128,6.6,"Current","Moderate","High",0
+"S264",42,"Male","White","College",28909,NA,144,90,61,251,60,101,142,72,5.2,"Former","Moderate","High",0
+"S265",48,"Female","White","High School",13470,NA,110,59,64,234,46,109,133,71,5.7,"Former","Moderate","Low",0
+"S266",67,"Female","Black","High School",38904,23.7,144,67,65,180,75,121,55,138,6,"Former","None","High",0
+"S267",32,"Male","Black","Graduate",55542,29.9,150,98,71,151,47,148,153,94,5.9,"Never","None","High",0
+"S268",41,"Male","White","College",66581,32.1,147,77,68,160,72,101,95,104,4.8,"Former","Moderate","Low",0
+"S269",73,"Female","Hispanic","High School",45536,16.9,115,64,62,254,54,110,205,41,NA,"Never","Heavy","Low",1
+"S270",74,"Male","White","High School",85897,31.2,131,76,53,191,50,188,68,78,4.3,"Former","Moderate","Moderate",0
+"S271",40,"Male","White","Graduate",16990,22,152,72,61,217,68,124,67,109,5.9,"Current","None","Sedentary",0
+"S272",22,"Female","White","High School",61224,38.2,112,88,63,107,66,156,124,95,4.3,"Former","None","Moderate",0
+"S273",36,"Female","Hispanic","College",100955,37,113,75,66,236,56,118,117,108,5.7,"Current","None","Moderate",0
+"S274",70,"Male","Black","College",54378,20.7,132,41,87,206,71,157,305,144,5.9,"Never","Moderate","Sedentary",0
+"S275",36,"Female","Hispanic","College",36390,26.1,129,83,69,248,65,139,392,18,6.5,"Current","Moderate","Sedentary",0
+"S276",64,"Male","White","High School",40043,29.1,162,78,84,NA,48,183,165,98,5.4,"Current","Moderate","Moderate",0
+"S277",44,"Male","White","College",NA,28.5,137,92,67,195,58,160,113,90,6.2,"Current","Moderate","Sedentary",0
+"S278",36,"Male","White","High School",29337,18.4,107,74,84,278,70,165,49,105,6.2,"Former","Heavy","High",0
+"S279",43,"Female","Hispanic","College",39102,31.7,96,89,61,213,52,143,189,103,5.7,"Former","Heavy","High",0
+"S280",38,"Female","White","High School",27479,31.6,143,77,86,187,48,73,157,60,6.6,"Current","None","Sedentary",0
+"S281",45,"Female","Other","College",68660,16.8,91,74,99,306,55,87,112,138,4.6,"Former","None","Moderate",0
+"S282",62,"Female","Black","Graduate",41329,31,142,79,73,212,68,75,190,77,5.1,"Former","None","Moderate",0
+"S283",31,"Female","Asian","High School",92448,36.1,131,86,70,189,67,73,154,123,6.1,"Current","None","Sedentary",0
+"S284",41,"Male","Black","Graduate",37980,32.7,117,77,66,226,60,167,161,100,5,"Former","None","High",0
+"S285",49,"Female","White","High School",NA,32.3,130,93,97,253,44,158,102,107,NA,"Current","Heavy","Sedentary",0
+"S286",54,"Male","White","College",205445,NA,136,83,82,290,85,156,289,86,6.6,"Never","Moderate","Low",0
+"S287",43,"Male","White","Graduate",12871,31.9,107,68,78,218,45,201,114,130,5.2,"Never","Moderate","Low",0
+"S288",49,"Male","White","College",104106,20.1,103,81,80,176,62,86,101,105,4.9,"Former","Moderate","Moderate",0
+"S289",49,"Male","White","High School",27803,33,103,91,78,238,57,169,121,70,5.8,"Never","Moderate","Moderate",1
+"S290",52,"Male","White","Graduate",33692,29.8,141,82,73,203,47,143,80,85,5.8,"Current","None","Sedentary",0
+"S291",29,"Male","White","High School",26694,37.2,145,74,62,276,26,149,187,104,4.4,"Never","None","Moderate",1
+"S292",62,"Male","White","College",97230,14.7,120,81,70,221,50,186,66,82,4.4,"Current","None","Sedentary",0
+"S293",28,"Female","Black","Graduate",15267,25.3,158,78,70,211,47,152,230,91,4.1,"Current","None","Low",0
+"S294",37,"Male","White","High School",52984,30.6,141,80,92,132,94,130,283,149,4.8,"Current","None","Low",0
+"S295",40,"Male","Hispanic","High School",35424,31.8,142,62,80,249,49,170,269,88,5.9,"Never","Heavy","Moderate",0
+"S296",29,"Female","White","Graduate",NA,18.9,110,60,92,195,53,125,306,123,NA,"Former","Heavy","Sedentary",0
+"S297",47,"Male","White","Graduate",94322,25,142,102,85,226,48,146,255,107,5.9,"Never","Moderate","Sedentary",0
+"S298",58,"Male","White","College",66278,31.6,108,68,71,193,100,164,158,123,5.4,"Never","None","Sedentary",1
+"S299",34,"Female","White","College",121921,24.9,152,92,64,153,48,130,87,102,4.1,"Current","Moderate","High",0
+"S300",59,"Male","Asian","High School",24081,22.2,112,81,73,171,38,145,113,97,5.6,"Never","None","Low",0
+"S301",60,"Male","White","College",59681,22.8,108,75,90,322,58,121,55,115,6.4,"Never","Moderate","Low",0
+"S302",37,"Female","Asian","College",93189,NA,101,78,84,180,64,108,173,106,6.5,"Never","None","Moderate",0
+"S303",50,"Male","Asian","High School",50521,31.2,129,75,57,216,40,63,146,64,6,"Never","Heavy","High",0
+"S304",53,"Female","Hispanic","High School",22988,27.8,137,74,62,295,32,96,50,108,6.7,"Former","Moderate","Sedentary",0
+"S305",39,"Female","White","Graduate",33808,28,108,71,75,173,32,131,107,94,4.7,"Former","None","Moderate",1
+"S306",44,"Female","White","High School",49683,40.6,103,89,58,291,72,108,116,88,5.8,"Current","Moderate","Low",0
+"S307",66,"Male","White","High School",75840,19.9,90,90,71,172,71,140,176,94,5.3,"Never","Moderate","High",0
+"S308",55,"Female","Black","High School",68725,28.7,145,73,55,165,84,155,93,75,5.2,"Never","None","Moderate",0
+"S309",49,"Female","Black","High School",52084,20,157,59,86,290,70,124,202,79,5.2,"Never","Moderate","Sedentary",0
+"S310",20,"Male","White","College",49368,20.4,137,76,74,220,51,121,177,128,6.9,"Former","None","High",0
+"S311",58,"Female","White","High School",23478,22.8,151,91,46,184,58,118,205,68,6.2,"Former","Heavy","Low",0
+"S312",40,"Female","White","Graduate",NA,26.5,124,99,63,220,25,101,135,97,5.1,"Current","Moderate","Sedentary",1
+"S313",67,"Female","White","College",NA,NA,112,70,86,221,35,217,265,123,5.9,"Never","Heavy","Moderate",0
+"S314",39,"Male","White","Graduate",54881,29.6,122,81,86,267,36,135,57,83,4.8,"Never","None","Sedentary",0
+"S315",49,"Female","Hispanic","College",14074,35.8,134,87,70,234,55,120,239,150,6.6,"Never","None","High",0
+"S316",50,"Male","White","High School",23280,28.2,143,75,43,NA,80,118,52,98,5.4,"Former","Moderate","Low",1
+"S317",53,"Female","White","Graduate",15531,29.3,101,91,69,270,57,116,121,121,NA,"Current","Moderate","Sedentary",0
+"S318",12,"Male","White","High School",60507,32.5,140,87,63,159,58,125,147,56,6.1,"Current","Moderate","Low",0
+"S319",28,"Female","White","Graduate",42271,29.2,102,80,51,NA,44,126,305,58,4.6,"Never","Moderate",NA,1
+"S320",18,"Female","White","High School",57115,42.9,152,85,86,157,49,158,178,43,6.6,"Never","Moderate","Moderate",0
+"S321",38,"Male","White","College",35151,22.4,117,83,74,219,47,128,212,91,6.1,"Never","Heavy","Low",0
+"S322",48,"Female","White","Graduate",NA,26.3,122,68,63,256,46,108,103,113,5.3,"Current","Heavy","Low",0
+"S323",21,"Male","Asian","College",72152,11.2,132,88,64,138,41,105,133,92,4.3,"Current","Moderate","Moderate",0
+"S324",56,"Female","Black","College",19486,36.8,153,65,66,176,67,158,163,49,5.3,"Never","Heavy","Moderate",0
+"S325",27,"Male","Black","Graduate",58166,32.2,119,84,84,282,36,151,255,88,5.8,"Former","Moderate","Moderate",0
+"S326",52,"Male","Black","College",37133,35.7,135,92,51,209,77,131,327,88,4.5,"Current","None","High",0
+"S327",52,"Female","White","College",41529,19.3,146,60,54,224,41,124,78,88,6.6,"Never","Moderate",NA,0
+"S328",32,"Male","Other","Graduate",57729,22.5,126,75,77,240,55,140,121,98,6.4,"Former","Moderate","Sedentary",0
+"S329",39,"Female","Hispanic","Graduate",73071,23.9,98,67,76,110,45,123,99,86,5.1,"Former","None","High",0
+"S330",37,"Male","Hispanic","College",42313,33.4,106,74,86,247,40,129,198,99,5,"Current","Heavy","Sedentary",0
+"S331",55,"Female","Other","Graduate",206977,24.2,142,86,73,168,78,144,294,94,5.4,"Never","None","High",1
+"S332",39,"Female","White","College",28304,38,123,71,60,164,57,49,144,86,6,"Former","Moderate","High",0
+"S333",45,"Male","Asian","College",66870,28.3,99,65,47,287,54,191,107,85,5.6,"Never","Heavy","Sedentary",0
+"S334",43,"Male","White","College",41038,14.9,167,77,69,167,56,121,148,120,5.4,"Former","Moderate","Sedentary",0
+"S335",48,"Male","White","High School",29111,28.6,118,72,85,163,65,148,134,79,5.8,"Never","Moderate","High",0
+"S336",67,"Male","Black","High School",33396,31.9,149,77,57,258,24,143,109,54,5.4,"Never","None","Low",1
+"S337",27,"Female","White","High School",56952,35.7,144,95,78,233,60,91,271,107,6.8,"Current","Moderate","Sedentary",0
+"S338",48,"Male","Hispanic","Graduate",89162,16.2,138,80,85,199,62,96,184,72,4.6,"Former","None","Moderate",0
+"S339",47,"Male","White","College",38888,21.8,122,94,59,134,46,85,233,61,NA,"Former","Moderate","Moderate",1
+"S340",53,"Male","White","College",32698,17,154,88,76,279,47,106,144,88,4.5,"Current","Moderate","Sedentary",0
+"S341",41,"Female","Black","College",44587,31,88,100,68,273,69,61,266,94,NA,"Current","Moderate","Low",0
+"S342",45,"Male","White","College",57643,25.8,122,94,57,224,76,173,132,120,6.7,"Never","Moderate","Moderate",0
+"S343",53,"Female","Black","High School",48694,34.7,121,86,46,251,57,162,195,92,6.9,"Former","Moderate","Low",0
+"S344",49,"Male","Other","High School",42474,32.1,109,57,59,258,56,145,81,82,6.1,"Current","Moderate","High",0
+"S345",47,"Male","White","College",53621,29,108,72,68,177,49,89,87,77,6.6,"Former","Heavy","Low",0
+"S346",44,"Male","Black","Graduate",NA,24.6,108,86,73,263,59,104,177,94,NA,"Never","None",NA,0
+"S347",34,"Male","White","High School",74546,21,158,68,83,240,70,88,81,84,5.8,"Former","Moderate","Low",0
+"S348",69,"Male","Black","College",47284,30.2,131,95,91,276,33,72,227,143,5.1,"Current","Moderate","Low",1
+"S349",30,"Female","White","Graduate",29548,33.5,113,97,55,235,61,81,92,73,5,"Former","Moderate","High",0
+"S350",56,"Female","White","High School",75620,35.7,123,88,78,274,54,139,219,89,NA,"Never","None","Low",0
+"S351",48,"Female","White","High School",32186,29.3,162,67,79,316,22,130,298,92,5.6,"Current","Heavy","Moderate",0
+"S352",53,"Female","Asian","High School",32305,33.5,119,77,83,201,32,83,118,75,6.5,"Never","Moderate",NA,0
+"S353",43,"Female","White","College",45073,24.2,140,69,85,87,55,160,105,122,5.1,"Former","None","High",0
+"S354",53,"Female","White","College",42220,NA,112,79,47,270,49,164,332,88,5.7,"Former","Moderate","High",0
+"S355",72,"Male","Hispanic","High School",NA,36,93,84,61,223,47,117,328,68,5.1,"Current","Moderate","High",0
+"S356",43,"Male","White","College",17423,32,119,81,64,NA,49,129,111,70,6.1,"Current","None","High",0
+"S357",42,"Male","Black","Graduate",42410,26.3,130,94,44,164,73,124,137,66,4.9,"Former","Moderate","Sedentary",0
+"S358",35,"Male","Asian","Graduate",35665,20.7,142,87,65,179,75,95,99,82,4.8,"Current","None","Low",0
+"S359",30,"Female","White","High School",135393,36.6,127,82,85,176,40,144,138,121,6.2,"Former","Heavy","Low",0
+"S360",51,"Female","Asian","Graduate",61340,21.8,137,87,86,203,51,160,291,88,3.6,"Current","Heavy","Moderate",0
+"S361",48,"Female","White","College",33309,NA,148,80,71,124,52,80,144,78,5.8,"Former","Moderate","High",0
+"S362",33,"Female","Black","College",47576,24.1,138,90,55,205,67,137,110,125,5.8,"Current","None","Low",0
+"S363",39,"Female","White","College",58729,25.2,110,61,63,141,71,106,296,118,6.2,"Current","Heavy","Moderate",0
+"S364",63,"Female","White","High School",83350,34,136,91,76,237,38,130,97,64,6.6,"Former","Heavy","Sedentary",0
+"S365",46,"Male","White","Graduate",67086,37.3,83,76,69,153,80,129,340,111,5.1,"Never","None","Sedentary",1
+"S366",55,"Male","White","Graduate",64889,23.4,145,70,97,241,48,166,139,79,5.8,"Current","None","Sedentary",1
+"S367",11,"Male","White","High School",121157,18.8,141,82,60,225,66,88,103,108,6.4,"Current","Moderate","Low",0
+"S368",27,"Male","White","High School",27859,25.8,120,58,53,NA,89,126,68,82,6.1,"Never","Heavy","Moderate",0
+"S369",45,"Female","White","College",24951,31.1,120,74,65,204,51,106,147,109,5.2,"Former","None","Moderate",1
+"S370",39,"Male","White","College",22192,24.2,75,61,66,244,32,81,248,76,6.7,"Never","None","Moderate",0
+"S371",36,"Female","White","Graduate",74998,21.6,144,85,71,154,40,165,219,99,5.9,"Current","None","Moderate",0
+"S372",37,"Male","White","College",99212,19.5,142,71,48,167,57,238,64,100,5.3,"Current","Moderate","High",0
+"S373",53,"Male","White","High School",56295,20.4,123,63,49,294,66,148,269,107,6.7,"Current","Moderate","Low",0
+"S374",62,"Female","Other","College",34261,24.4,123,65,60,125,89,128,129,70,5.4,"Former","None","Sedentary",0
+"S375",20,"Female","Black","High School",53655,18.7,111,68,72,201,73,189,154,114,6.5,"Current","None","Moderate",0
+"S376",58,"Male","White","High School",87138,40.9,133,73,75,272,53,75,139,89,6.9,"Current","Heavy","Sedentary",1
+"S377",59,"Female","Hispanic","High School",22315,28.2,128,82,87,269,61,157,75,98,4.7,"Never","Moderate",NA,0
+"S378",37,"Female","White","High School",47539,21.5,139,79,85,289,45,142,178,53,5.1,"Former","Heavy","Low",0
+"S379",49,"Female","Black","Graduate",56571,31.1,124,72,66,188,60,177,145,84,7.4,"Never","Heavy","Moderate",0
+"S380",59,"Male","White","High School",186464,24.5,138,86,86,233,74,164,100,84,6.2,"Former","Heavy","Sedentary",0
+"S381",37,"Female","Asian","High School",83492,31.2,141,63,87,114,58,109,96,85,5.9,"Former","None","High",0
+"S382",43,"Female","Hispanic","High School",54100,30.6,116,86,64,186,23,83,170,92,6.5,"Never","Moderate","Sedentary",0
+"S383",51,"Male","Hispanic","High School",190079,19.5,143,82,64,215,47,153,127,71,5.5,"Never","Moderate","Moderate",0
+"S384",40,"Male","White","Graduate",12938,30.7,133,99,67,270,65,103,170,85,3.9,"Current","None","Sedentary",0
+"S385",71,"Male","White","High School",69985,33.8,104,86,77,254,47,138,367,122,5.6,"Former","Moderate","Sedentary",1
+"S386",41,"Female","Black","Graduate",17368,33.9,144,83,56,233,72,93,128,87,4.7,"Never","Moderate","High",1
+"S387",51,"Female","Hispanic","College",33090,28.6,102,91,83,103,69,196,271,107,4.9,"Former","None","Low",0
+"S388",37,"Male","White","College",33688,30.2,105,77,50,227,38,183,142,106,5.6,"Current","Heavy","Moderate",0
+"S389",59,"Female","Asian","College",92019,26,107,65,77,159,59,162,123,49,7,"Never","Heavy","Moderate",0
+"S390",55,"Female","White","College",NA,38.3,127,74,87,248,60,113,237,122,4.4,"Current","Moderate","Moderate",0
+"S391",43,"Male","White","High School",46588,17.9,101,65,78,264,62,175,168,83,5.8,"Former","Moderate","Moderate",0
+"S392",63,"Male","Black","College",18139,34.8,116,75,62,152,48,116,163,128,6.1,"Never","None",NA,1
+"S393",60,"Female","White","College",76397,24.4,134,87,65,172,31,122,245,93,6,"Never","None","Sedentary",0
+"S394",57,"Male","White","Graduate",45917,19.9,125,82,52,219,51,171,300,62,2.8,"Never","Moderate","Moderate",0
+"S395",46,"Male","White","High School",107163,14.3,142,77,77,226,65,127,64,112,6.2,"Current","None","High",1
+"S396",36,"Male","White","High School",20550,28.4,116,83,65,165,59,120,90,60,4.7,"Former","None","Sedentary",0
+"S397",39,"Female","Other","Graduate",144513,27.6,135,84,64,355,64,140,126,123,5.5,"Former","None","Moderate",0
+"S398",42,"Male","White","College",22127,37.5,144,85,72,187,59,113,443,132,6.2,"Never","Moderate","Moderate",0
+"S399",21,"Male","Black","High School",77857,16.8,141,71,87,214,69,150,101,107,5.5,"Former","Moderate","High",0
+"S400",32,"Female","Black","College",37217,29.1,110,78,89,181,58,149,152,112,5.7,"Current","None","Low",0
+"S401",43,"Male","White","High School",NA,36.6,92,66,58,118,66,162,125,103,5.7,"Never","Moderate","Low",0
+"S402",35,"Female","Asian","High School",37981,28.6,105,83,76,272,58,136,257,112,4.5,"Former","None","Low",0
+"S403",61,"Female","White","High School",44722,20.5,135,66,58,NA,52,120,120,53,6.1,"Never","None","Moderate",0
+"S404",38,"Female","White","Graduate",27910,28,129,73,73,218,79,99,82,85,4.3,"Current","Moderate","Moderate",0
+"S405",39,"Male","White","Graduate",69140,26.1,139,74,65,222,46,143,94,68,5.4,"Never","Moderate","Low",0
+"S406",41,"Female","Black","College",48901,36.6,142,66,51,236,54,159,88,94,5.6,"Current","Moderate","Sedentary",0
+"S407",39,"Female","White","Graduate",36740,29.3,119,84,86,243,29,59,125,139,4.7,"Never","Heavy","High",0
+"S408",55,"Male","Other","High School",55531,21.5,128,86,70,187,34,197,117,101,7.6,"Current","Moderate","Moderate",0
+"S409",36,"Female","White","College",47577,38,105,69,61,247,64,104,103,102,5.6,"Current","None",NA,0
+"S410",37,"Female","Black","College",76507,27.9,126,64,79,219,45,129,104,139,5.7,"Former","Heavy","Sedentary",0
+"S411",24,"Male","White","College",39921,32.3,134,78,52,214,57,158,146,76,5,"Never","Moderate","Low",0
+"S412",61,"Female","Hispanic","High School",44922,36.8,120,99,86,183,63,114,141,96,7.3,"Former","None","Sedentary",1
+"S413",32,"Male","White","College",55532,25.7,106,67,68,228,52,125,56,61,NA,"Current","Moderate","High",1
+"S414",47,"Male","White","Graduate",59367,27.4,130,77,74,198,79,133,252,66,5.4,"Current","Moderate","Sedentary",0
+"S415",49,"Female","White","College",52669,19.2,126,98,69,140,59,132,166,114,5.5,"Current","None","Moderate",0
+"S416",49,"Female","White","College",90701,26.4,140,73,58,237,72,142,146,93,5,"Former","Moderate","Moderate",0
+"S417",31,"Female","Black","High School",33603,38.8,121,89,78,274,50,122,204,109,5.5,"Current","Moderate","Moderate",0
+"S418",29,"Male","White","High School",59301,28.3,95,75,83,203,55,91,130,99,5.4,"Never","Moderate","Low",0
+"S419",40,"Male","Hispanic","High School",33996,38.2,137,74,92,196,12,111,186,92,4.6,"Former","Heavy","Moderate",0
+"S420",17,"Female","White","High School",68409,33.6,94,96,80,188,43,147,62,67,4.6,"Never","Moderate",NA,0
+"S421",60,"Male","Black","High School",NA,28.8,76,91,67,280,5,161,163,48,6.4,"Never","Moderate","Low",0
+"S422",46,"Male","White","Graduate",47412,27.7,101,92,87,270,51,72,257,91,4.8,"Never","Heavy","Low",0
+"S423",66,"Male","Asian","High School",37798,NA,127,69,93,NA,64,182,308,149,4.2,"Never","Moderate","Sedentary",0
+"S424",43,"Male","Black","High School",NA,40.9,143,59,73,190,59,87,115,142,5.8,"Never","Moderate","Sedentary",0
+"S425",47,"Female","White","College",19726,NA,137,81,43,180,56,162,189,68,4.3,"Former","None","Moderate",0
+"S426",48,"Male","White","Graduate",76753,32.5,132,69,69,227,23,59,111,93,5.1,"Former","None","Sedentary",0
+"S427",41,"Male","Black","College",27776,24,126,68,57,167,53,157,203,92,5.2,"Current","Moderate","Moderate",0
+"S428",49,"Female","White","High School",25335,31.3,116,84,81,293,54,148,109,78,6.9,"Never","Moderate","High",1
+"S429",40,"Male","Hispanic","High School",28694,31.4,82,80,59,274,40,131,146,110,6.2,"Current","Heavy","Low",0
+"S430",29,"Male","Black","Graduate",25668,29.4,119,70,69,253,60,126,385,46,4.7,"Former","None",NA,0
+"S431",66,"Female","Asian","College",75382,30.9,118,76,88,269,71,59,164,81,6.3,"Current","None","Sedentary",0
+"S432",39,"Female","White","Graduate",36040,13.4,144,76,73,290,54,141,132,124,6,"Never","Moderate","Sedentary",0
+"S433",49,"Male","White","College",27491,20.4,95,67,94,230,36,84,239,108,5.9,"Former","None","Moderate",0
+"S434",45,"Male","White","High School",21575,34.8,132,80,69,315,63,183,115,118,5.8,"Current","None","High",0
+"S435",33,"Male","Black","College",40386,31.3,124,87,59,207,45,131,97,90,5.9,"Former","None","Low",0
+"S436",38,"Female","Hispanic","High School",325568,24.2,126,82,78,185,51,64,153,89,4.2,"Current","None","High",0
+"S437",35,"Male","White","College",34888,20,101,59,69,277,36,148,134,117,5.8,"Former","Moderate","High",0
+"S438",34,"Male","Hispanic","College",NA,32.8,150,68,70,197,76,129,376,133,5.3,"Current","Moderate","Low",1
+"S439",57,"Male","White","College",23326,27.6,133,85,72,241,29,222,256,111,5.8,"Never","None","Moderate",0
+"S440",29,"Male","White","Graduate",41645,36.2,127,93,51,236,50,119,207,61,5.1,"Former","Moderate","Low",0
+"S441",50,"Male","White","High School",43954,32.5,91,82,74,219,36,139,191,98,5.3,"Never","Heavy","High",0
+"S442",31,"Female","White","Graduate",26271,14.5,134,76,71,192,65,94,73,133,4.7,"Never","Heavy","Moderate",0
+"S443",54,"Female","Asian","High School",106570,31.9,138,72,59,242,31,161,154,88,4.3,"Current","Moderate","High",0
+"S444",55,"Female","White","Graduate",30710,26.7,139,69,72,173,49,154,204,67,6.3,"Current","Moderate","High",0
+"S445",40,"Male","Other","High School",36477,21.6,99,59,77,210,54,102,137,76,6.3,"Former","Moderate","Low",1
+"S446",40,"Female","White","College",64245,18.5,106,78,81,308,41,103,141,112,6.5,"Former","Moderate","Low",0
+"S447",46,"Male","Asian","College",29538,29.4,111,95,64,232,64,158,103,108,6.6,"Never","None","Low",0
+"S448",58,"Male","Asian","Graduate",37970,21.6,104,82,93,249,75,136,105,88,5.5,"Never","None","Low",0
+"S449",54,"Female","Black","High School",43118,32.3,121,75,65,200,45,167,210,118,5.8,"Former","Moderate","High",0
+"S450",56,"Male","Black","College",74012,32.8,153,98,80,265,42,102,179,119,6.1,"Never","None","Low",0
+"S451",48,"Male","Hispanic","College",78078,31.8,128,84,71,202,30,143,150,58,6.1,"Never","Moderate","Sedentary",0
+"S452",51,"Male","Black","Graduate",49152,20.8,126,77,83,165,44,169,124,75,4.7,"Never","Heavy","Sedentary",0
+"S453",45,"Female","White","Graduate",49171,21,102,76,86,276,32,59,141,106,5.5,"Current","None","Low",0
+"S454",46,"Female","Other","High School",37207,22.7,136,65,58,252,66,122,170,124,6.4,"Never","Heavy","Sedentary",1
+"S455",42,"Male","White","College",41221,30.3,128,75,99,NA,76,168,169,88,5.5,"Former","None","Low",0
+"S456",55,"Male","White","College",89631,18.6,108,51,59,184,37,90,160,38,6.1,"Current","Heavy","Moderate",0
+"S457",41,"Male","White","College",41569,19.6,137,89,69,211,56,130,109,103,5.8,"Never","Moderate","Low",0
+"S458",68,"Male","Asian","High School",31034,35.6,102,89,85,272,34,131,45,122,6.6,"Former","Moderate","Moderate",0
+"S459",31,"Male","White","High School",20089,27.6,105,86,57,191,31,138,44,122,4.6,"Former","None","Moderate",0
+"S460",48,"Female","White","College",66786,31.1,153,63,78,164,51,160,49,94,5.5,"Former","Moderate","High",0
+"S461",49,"Male","White","Graduate",123991,NA,114,68,57,190,63,114,352,64,5.3,"Never","Moderate","High",0
+"S462",57,"Female","White","Graduate",88125,26.5,133,85,67,147,64,139,162,114,5,"Former","None","Sedentary",0
+"S463",32,"Female","Hispanic","Graduate",36910,18.8,113,89,94,218,38,121,113,104,4.9,"Never","Heavy","Low",0
+"S464",38,"Female","Black","Graduate",49170,28.7,102,68,63,148,59,128,102,96,5.1,"Never","Moderate","Low",1
+"S465",46,"Female","White","Graduate",45534,30.2,121,83,65,249,61,117,108,109,6,"Current","Moderate","High",0
+"S466",39,"Female","Other","High School",16310,36.1,130,86,108,249,61,113,26,87,4.7,"Never","None","High",0
+"S467",53,"Male","Asian","College",15755,26.6,135,83,57,295,44,149,167,110,4.7,"Former","Moderate","Sedentary",1
+"S468",56,"Female","Asian","College",55318,30.4,121,75,70,231,36,105,233,123,4.9,"Current","Moderate","High",0
+"S469",48,"Male","Hispanic","College",NA,25.5,119,64,71,152,73,134,124,76,8,"Never","None","Moderate",0
+"S470",62,"Male","White","High School",52339,26.3,118,65,58,196,41,163,185,73,5.7,"Current","None","Sedentary",0
+"S471",47,"Female","Hispanic","College",31496,23.9,141,67,81,248,49,162,152,78,5.7,"Current","Moderate","Low",0
+"S472",51,"Female","Hispanic","College",49498,32.9,98,68,62,276,69,103,146,34,5.5,"Former","None","Sedentary",0
+"S473",49,"Female","Black","High School",112860,25.6,155,57,69,236,69,175,234,88,5.9,"Never","Moderate","Low",0
+"S474",40,"Female","Hispanic","Graduate",46108,31.6,110,65,90,156,41,132,261,102,5.5,"Current","Moderate","Low",0
+"S475",37,"Male","White","Graduate",80853,29.6,118,81,77,168,60,140,90,131,5.9,"Current","Heavy","Low",0
+"S476",38,"Male","White","High School",42032,27.5,102,89,90,NA,35,145,70,99,4.7,"Never","Moderate","Moderate",0
+"S477",50,"Female","Hispanic","College",27099,24.8,121,69,60,156,82,201,59,81,4.6,"Current","Heavy","Sedentary",0
+"S478",36,"Female","Black","High School",91493,18,124,81,74,262,53,132,100,85,5.4,"Never","Moderate","Sedentary",0
+"S479",41,"Male","Asian","Graduate",133996,35.4,121,76,73,212,43,74,116,65,5.3,"Former","None","Moderate",0
+"S480",35,"Female","Hispanic","College",14926,31.5,151,89,71,255,53,115,156,93,4.5,"Former","Moderate","Low",0
+"S481",58,"Male","Black","College",16663,30.4,132,67,85,213,45,141,126,95,NA,"Never","Moderate","Low",0
+"S482",40,"Male","White","College",66845,37.4,127,78,49,227,48,149,140,111,6,"Never","Moderate","High",0
+"S483",53,"Female","White","Graduate",32460,26.2,123,81,74,218,39,106,128,80,6.8,"Never","Heavy","Moderate",0
+"S484",50,"Male","White","High School",75921,NA,149,74,48,247,87,125,158,91,7.8,"Former","None","Moderate",0
+"S485",45,"Male","White","College",NA,26.9,148,76,79,159,78,123,306,67,6,"Former","Moderate","Moderate",0
+"S486",36,"Male","Hispanic","Graduate",86039,23.2,137,63,94,185,59,67,168,117,NA,"Current","Moderate","Moderate",0
+"S487",23,"Female","White","High School",38466,28.6,135,62,75,141,43,129,146,70,5,"Never","Moderate","Low",0
+"S488",57,"Male","White","College",NA,42.8,147,90,83,240,69,158,140,73,6.5,"Current","Moderate","Sedentary",1
+"S489",43,"Male","White","Graduate",21169,21.3,135,88,54,NA,71,73,508,112,6.4,"Current","Moderate","Sedentary",0
+"S490",47,"Female","Hispanic","High School",33619,29.9,142,94,49,218,46,228,75,123,6.2,"Former","Moderate","High",0
+"S491",52,"Female","White","High School",64780,29.4,124,68,70,189,66,141,180,76,5.7,"Current","Moderate","Moderate",1
+"S492",39,"Female","White","College",40985,33.4,125,94,81,204,40,138,135,67,6.5,"Never","None","Moderate",0
+"S493",54,"Female","Black","High School",26209,21.9,134,77,92,292,50,128,254,134,4.6,"Never","None","Low",0
+"S494",46,"Female","Black","College",NA,33.2,124,95,57,119,70,154,211,87,4.9,"Former","Moderate","Sedentary",0
+"S495",48,"Female","Black","Graduate",72815,28.6,141,65,68,94,58,163,178,129,6.2,"Former","Moderate","High",0
+"S496",40,"Female","White","High School",58530,33.9,149,79,61,206,67,138,580,61,NA,"Former","Heavy","Moderate",0
+"S497",55,"Male","White","Graduate",41427,22.9,159,76,54,153,55,154,82,86,4.8,"Former","Heavy","Moderate",0
+"S498",51,"Male","White","Graduate",48999,27.7,141,69,62,211,49,75,340,92,5.5,"Never","Heavy","Moderate",0
+"S499",69,"Female","Black","High School",91392,23,115,80,61,104,47,148,127,108,5.6,"Never","Moderate","Low",0
+"S500",43,"Male","Hispanic","High School",95207,31.7,118,69,69,202,36,166,150,90,5.3,"Current","None",NA,0

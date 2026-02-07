@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Shinylive cache (large binary assets, downloaded at export time)
+.shinylive/
