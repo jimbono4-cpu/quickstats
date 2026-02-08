@@ -26,10 +26,11 @@
 | haven | Tier 3: File I/O | PASS | 2.5.4 | 0.009 | — |
 | readxl | Tier 3: File I/O | PASS | 1.4.3 | 0.028 | — |
 | lme4 | Tier 4: Advanced | PASS | 1.1.35.1 | 0.564 | — |
-| ggdag | Tier 4: Advanced | FAIL | — | 0.001 | Not installable in test env; deep dependency chain (dagitty, ggraph, tidygraph). WebR availability TBD. |
+| ggdag | Tier 4: Advanced | FAIL (std R) / PASS (WebR) | 0.2.13 (WebR) | 0.001 | Not installable in std R test env (deep deps). **Available in WebR WASM repo** — confirmed in browser Run 2. |
 | writexl | Tier 4: Advanced | PASS | 1.5.0 | 0.026 | — |
 
-**Summary: 14/15 loaded, 1 failed (ggdag — Tier 4, has fallback)**
+**Standard R summary: 14/15 loaded, 1 failed (ggdag — not installable in std R test env)**
+**WebR/Browser summary: 15/15 loaded (ggdag available via WebR WASM repo)**
 
 ## 2. Functional Smoke Test Results
 
@@ -103,34 +104,35 @@ _These tests require deploying the Shinylive test app and running manually in ea
 | haven | **INCLUDE** | Tier 3 I/O. Loaded (0.01s), write_dta/read_dta roundtrip preserves data. |
 | readxl | **INCLUDE** | Tier 3 I/O. Loaded (0.03s), reads built-in .xlsx example successfully. |
 | lme4 | **EXPERIMENTAL** | Tier 4. Loaded (0.6s), simple random-intercept model fits in 0.05s. Mark as experimental in UI per lme4 policy. Disable if WebR benchmark exceeds 30s. |
-| ggdag | **EXCLUDE** | Tier 4. Failed to install due to deep dependency chain (dagitty, ggraph, tidygraph, graphlayouts). **Fallback: Pure ggplot2 manual DAG rendering** with geom_segment() arrows and geom_point() nodes. Core DAG variable classification (confounder/mediator/collider) is unaffected — only the auto-rendered diagram changes. |
+| ggdag | **INCLUDE** | Tier 4. Failed to install in standard R test env (deep dependency chain), but **confirmed available in WebR WASM repo** — loaded successfully in browser Run 2 as v0.2.13. Full DAG rendering capability available. |
 | writexl | **INCLUDE** | Tier 4. Loaded (0.03s), writes valid .xlsx file. |
 
 ## 6. Confirmed v1 Package List
 
-### Confirmed (Include)
+### Confirmed (Include) — 15 packages
 
-- `gt` v0.11.1 — Primary table rendering
-- `gtsummary` v2.5.0.9001 — Table 1 and summary statistics
-- `ggplot2` v3.4.4 — All plotting
-- `broom` v1.0.5 — Model tidying
-- `labelled` v2.12.0 — Variable label handling
-- `survival` v3.5.8 — Kaplan-Meier and Cox regression
-- `sandwich` v3.1.0 — Cluster-robust standard errors
-- `lmtest` v0.9.40 — Coefficient testing with robust vcov
-- `car` v3.1.2 — VIF and diagnostics
-- `emmeans` v1.10.0 — Estimated marginal means
-- `haven` v2.5.4 — Stata/SPSS file import
-- `readxl` v1.4.3 — Excel file import
-- `writexl` v1.5.0 — Excel file export
+- `gt` v1.3.0 (WebR) — Primary table rendering
+- `gtsummary` v2.5.0 (WebR) — Table 1 and summary statistics
+- `ggplot2` v4.0.1 (WebR) — All plotting
+- `broom` v1.0.12 (WebR) — Model tidying
+- `labelled` v2.16.0 (WebR) — Variable label handling
+- `survival` v3.8.3 (WebR) — Kaplan-Meier and Cox regression
+- `sandwich` v3.1.1 (WebR) — Cluster-robust standard errors
+- `lmtest` v0.9.40 (WebR) — Coefficient testing with robust vcov
+- `car` v3.1.5 (WebR) — VIF and diagnostics
+- `emmeans` v2.0.1 (WebR) — Estimated marginal means
+- `haven` v2.5.5 (WebR) — Stata/SPSS file import
+- `readxl` v1.4.5 (WebR) — Excel file import
+- `writexl` v1.5.4 (WebR) — Excel file export
+- `ggdag` v0.2.13 (WebR) — DAG visualization (available in WebR WASM repo)
 
 ### Experimental
 
-- `lme4` v1.1.35.1 — Mixed models. Label as "Experimental" in UI. Disable entirely if WebR benchmark >30s for simple random-intercept model.
+- `lme4` v1.1.38 (WebR) — Mixed models. Label as "Experimental" in UI. Disable entirely if WebR benchmark >30s for simple random-intercept model.
 
-### Excluded (Use Fallbacks)
+### Excluded
 
-- ~~`ggdag`~~ — **Fallback:** Pure ggplot2 manual DAG rendering using `geom_segment()` + `geom_point()` + `geom_text()`. The causal reasoning module (Step 4) is unaffected — users still classify variables as confounder/mediator/collider/etc. Only the auto-generated DAG diagram uses a simpler rendering approach.
+- _None._ All 15 planned packages are confirmed available in WebR.
 
 ---
 
@@ -189,7 +191,7 @@ The updated test app must be re-run in the browser to determine which packages h
 ### Browser Test Checklist
 
 - [x] Chrome (desktop): Run 1 complete (9/15 loaded, benchmarks blocked by bugs)
-- [ ] Chrome (desktop): Run 2 with fixed test app (pending)
+- [x] Chrome (desktop): Run 2 with fixed test app (15/15 loaded, 15/15 smoke pass)
 - [ ] Firefox (desktop): Run all 3 test suites
 - [ ] Safari (Mac): Run all 3 test suites
 - [ ] Safari memory test: Run full workflow twice without reload
@@ -199,12 +201,76 @@ The updated test app must be re-run in the browser to determine which packages h
 
 ---
 
+## WebR/Shinylive Browser Validation (Run 2 — 2026-02-07)
+
+**Browser:** Chrome on Windows laptop, WebR/Shinylive with `webr::install()` fix applied
+**Result:** All packages installed and loaded successfully. All smoke tests passed.
+
+### Browser Package Load Results (Run 2)
+
+| Package | Tier | Browser Status | Version | Notes |
+|---------|------|---------------|---------|-------|
+| gt | Tier 1: Core | PASS | 1.3.0 | Installed via webr::install() |
+| gtsummary | Tier 1: Core | PASS | 2.5.0 | Installed via webr::install() |
+| ggplot2 | Tier 1: Core | PASS | 4.0.1 | Pre-installed |
+| broom | Tier 1: Core | PASS | 1.0.12 | Pre-installed |
+| labelled | Tier 1: Core | PASS | 2.16.0 | Installed via webr::install() |
+| survival | Tier 2: Analysis | PASS | 3.8.3 | Pre-installed |
+| sandwich | Tier 2: Analysis | PASS | 3.1.1 | Pre-installed |
+| lmtest | Tier 2: Analysis | PASS | 0.9.40 | Pre-installed |
+| car | Tier 2: Analysis | PASS | 3.1.5 | Installed via webr::install() |
+| emmeans | Tier 2: Analysis | PASS | 2.0.1 | Installed via webr::install() |
+| haven | Tier 3: File I/O | PASS | 2.5.5 | Pre-installed |
+| readxl | Tier 3: File I/O | PASS | 1.4.5 | Pre-installed |
+| lme4 | Tier 4: Advanced | PASS | 1.1.38 | Pre-installed |
+| ggdag | Tier 4: Advanced | PASS | 0.2.13 | Installed via webr::install() |
+| writexl | Tier 4: Advanced | PASS | 1.5.4 | Pre-installed |
+
+**Browser result: 15/15 loaded (100%)**
+
+### Browser Smoke Test Results (Run 2)
+
+| Test | Status | Notes |
+|------|--------|-------|
+| gt: Render mtcars[1:5,] as raw HTML | PASS | — |
+| gtsummary: tbl_summary(mtcars[,1:4]) | PASS | — |
+| ggplot2: Scatter plot (mpg vs hp) + PNG export | PASS | — |
+| broom: tidy(lm(mpg ~ hp, mtcars)) | PASS | — |
+| labelled: Set/get variable labels roundtrip | PASS | — |
+| survival: survfit(Surv(time, status) ~ x, aml) | PASS | — |
+| sandwich: vcovCL(lm, cluster=mtcars$cyl) | PASS | — |
+| lmtest: coeftest with sandwich robust vcov | PASS | — |
+| car: VIF for lm(mpg ~ hp + wt + disp) | PASS | — |
+| emmeans: Marginal means from one-way ANOVA | PASS | — |
+| haven: Write/read Stata .dta roundtrip | PASS | — |
+| readxl: Read built-in example .xlsx | PASS | — |
+| lme4: lmer(Reaction ~ Days + (1\|Subject), sleepstudy) | PASS | — |
+| ggdag: dagify() + ggdag() renders DAG | PASS | — |
+| writexl: write_xlsx(mtcars, tempfile) | PASS | — |
+
+**Browser smoke tests: 15/15 passed (100%)**
+
+### Browser Benchmark Results (Run 2)
+
+All 11 benchmarks reported "object 'd' not found" — this was caused by a variable scoping bug in the test app (`quote({...})` expressions do not capture variables from parent scope). The fix (changing `quote()` to `function()` closures) was committed but the user's local copy had not yet pulled this change during Run 2. **This is a test infrastructure bug, not a WebR limitation.** Benchmarks should be re-run after pulling the latest code.
+
+### Run 2 Summary
+
+The `webr::install()` fix resolved all Run 1 failures. Every package that failed in Run 1 (gt, gtsummary, labelled, car, emmeans) loaded successfully after being explicitly installed from the WebR WASM repository. Notably, **ggdag also loaded** — its deep dependency chain (dagitty, ggraph, tidygraph, graphlayouts) is fully available as WASM binaries.
+
+---
+
 ## Gate Decision
 
-**Standard R baseline: PASS (14/15 packages, all smoke tests, all benchmarks <3s)**
+**Standard R baseline: PASS** — 14/15 packages loaded (ggdag excluded in std R env), all 14 smoke tests pass, all 11 benchmarks <3s.
 
-**Browser Run 1: PARTIAL (9/15 loaded — test app bug, not WebR limitation)**
+**WebR/Browser Run 2: PASS** — 15/15 packages loaded, 15/15 smoke tests pass. Benchmarks pending re-run (test infrastructure bug, not WebR issue).
 
-The initial browser failure was caused by missing `webr::install()` calls, not by WebR package unavailability. The test app has been fixed. A second browser run is needed to confirm the true WebR package availability.
+### GATE: PASS
 
-**Action:** Re-run the updated test app in browser. If gt, gtsummary, labelled, car, and emmeans load after the fix, the gate is PASS and Phase 1 can proceed with the full confirmed package list. If any remain unavailable, activate their fallbacks per the table above.
+Phase 0 validation is complete. All 15 planned packages are confirmed available and functional in WebR/Shinylive. No fallbacks are needed. Phase 1 development may proceed with the full confirmed package list.
+
+**Remaining optional items:**
+- Re-run benchmarks in browser after pulling the `function()` closure fix to get WebR performance timings
+- Cross-browser testing (Firefox, Safari, Edge) for additional confidence
+- Safari memory test to verify no memory leaks during repeated workflows
