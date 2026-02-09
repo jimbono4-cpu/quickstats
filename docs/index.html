@@ -20,7 +20,9 @@
 # All computation runs client-side via WebR/WASM. No data leaves the browser.
 # =============================================================================
 
-# --- Package installation (WebR-aware) ---------------------------------------
+library(shiny)
+
+# --- WebR detection and package installation ---------------------------------
 
 is_webr <- function() {
   Sys.getenv("WEBR") != "" ||
@@ -42,33 +44,38 @@ install_if_needed <- function(pkg_name) {
   }
 }
 
-# Core packages — install before loading
-core_pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
-               "survival", "sandwich", "lmtest", "car", "emmeans",
-               "haven", "readxl", "writexl", "lme4", "ggdag")
-
-for (pkg in core_pkgs) install_if_needed(pkg)
-
-library(shiny)
-library(ggplot2)
-library(broom)
-
 # --- Helper functions ---------------------------------------------------------
 
-#' Detect variable types in a data frame
+#' Detect variable types using heuristics
+#' Character/factor -> categorical
+#' Numeric with <=10 unique non-NA values -> categorical
+#' Otherwise numeric -> numeric
 classify_variables <- function(df) {
   types <- sapply(names(df), function(col) {
     x <- df[[col]]
     if (inherits(x, c("Date", "POSIXct", "POSIXlt"))) return("date")
+    if (is.factor(x) || is.character(x) || is.logical(x)) return("categorical")
     if (is.numeric(x) || is.integer(x)) {
       n_unique <- length(unique(na.omit(x)))
-      if (n_unique <= 5) return("categorical")
+      if (n_unique <= 10) return("categorical")
       return("numeric")
     }
-    if (is.factor(x) || is.character(x) || is.logical(x)) return("categorical")
     "other"
   })
   data.frame(variable = names(df), type = unname(types), stringsAsFactors = FALSE)
+}
+
+#' Prepare data for modelling: convert detected categoricals to factor
+prepare_model_data <- function(df, var_types) {
+  for (i in seq_len(nrow(var_types))) {
+    v <- var_types$variable[i]
+    if (var_types$type[i] == "categorical" && v %in% names(df)) {
+      if (!is.factor(df[[v]])) {
+        df[[v]] <- factor(df[[v]])
+      }
+    }
+  }
+  df
 }
 
 #' Safe file reader — detects format from extension
@@ -117,7 +124,7 @@ var_summary <- function(x, name = "") {
   n_miss <- sum(is.na(x))
   pct_miss <- round(100 * n_miss / n, 1)
 
-  if (is.numeric(x)) {
+  if (is.numeric(x) && length(unique(na.omit(x))) > 10) {
     vals <- na.omit(x)
     list(
       variable = name, type = "numeric",
@@ -202,10 +209,11 @@ upload_server <- function(id, shared) {
     })
 
     observeEvent(input$use_example, {
-      shared$data <- mtcars
-      shared$data$car_name <- rownames(mtcars)
+      d <- mtcars
+      d$car_name <- rownames(mtcars)
+      shared$data <- d
       shared$data_name <- "mtcars (example)"
-      shared$var_types <- classify_variables(shared$data)
+      shared$var_types <- classify_variables(d)
       showNotification("Loaded mtcars example data (32 rows x 12 columns)", type = "message")
     })
 
@@ -215,13 +223,14 @@ upload_server <- function(id, shared) {
     output$data_info <- renderUI({
       req(shared$data)
       df <- shared$data
-      n_num <- sum(sapply(df, is.numeric))
-      n_cat <- ncol(df) - n_num
+      vt <- shared$var_types
+      n_num <- sum(vt$type == "numeric")
+      n_cat <- sum(vt$type == "categorical")
       n_miss <- sum(is.na(df))
       tagList(
         p(strong("File:"), shared$data_name),
         p(strong("Dimensions:"), nrow(df), "rows x", ncol(df), "columns"),
-        p(strong("Variables:"), n_num, "numeric,", n_cat, "categorical"),
+        p(strong("Detected types:"), n_num, "numeric,", n_cat, "categorical"),
         if (n_miss > 0) p(strong("Missing values:"), n_miss,
                           paste0("(", round(100 * n_miss / (nrow(df) * ncol(df)), 1), "%)"))
         else p(strong("Missing values:"), "None")
@@ -287,11 +296,15 @@ explore_server <- function(id, shared) {
     output$summary_table <- renderTable({
       req(shared$data)
       df <- shared$data
+      vt <- shared$var_types
       summaries <- lapply(names(df), function(col) {
+        detected <- if (!is.null(vt) && col %in% vt$variable) {
+          vt$type[vt$variable == col]
+        } else "unknown"
         s <- var_summary(df[[col]], col)
         if (s$type == "numeric") {
           data.frame(
-            Variable = s$variable, Type = "Numeric",
+            Variable = s$variable, `Detected Type` = detected,
             N = s$n, Missing = paste0(s$n_missing, " (", s$pct_missing, "%)"),
             `Mean (SD)` = paste0(s$mean, " (", s$sd, ")"),
             `Median [Min, Max]` = paste0(s$median, " [", s$min, ", ", s$max, "]"),
@@ -300,7 +313,7 @@ explore_server <- function(id, shared) {
           )
         } else {
           data.frame(
-            Variable = s$variable, Type = "Categorical",
+            Variable = s$variable, `Detected Type` = detected,
             N = s$n, Missing = paste0(s$n_missing, " (", s$pct_missing, "%)"),
             `Mean (SD)` = "-",
             `Median [Min, Max]` = "-",
@@ -314,6 +327,7 @@ explore_server <- function(id, shared) {
 
     output$dist_plot <- renderPlot({
       req(shared$data, input$plot_var)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       df <- shared$data
       v <- input$plot_var
       if (!(v %in% names(df))) return(NULL)
@@ -325,27 +339,32 @@ explore_server <- function(id, shared) {
         if (!is.null(l)) lbl <- paste0(l, " (", v, ")")
       }
 
-      if (is.numeric(x)) {
-        ggplot(data.frame(x = x), aes(x = x)) +
-          geom_histogram(bins = 30, fill = "#4e79a7", color = "white", alpha = 0.8) +
-          labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
-          theme_minimal(base_size = 14)
+      vt <- shared$var_types
+      is_cat <- (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical") ||
+                is.character(x) || is.factor(x)
+
+      if (!is_cat && is.numeric(x)) {
+        ggplot2::ggplot(data.frame(x = x), ggplot2::aes(x = x)) +
+          ggplot2::geom_histogram(bins = 30, fill = "#4e79a7", color = "white", alpha = 0.8) +
+          ggplot2::labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
+          ggplot2::theme_minimal(base_size = 14)
       } else {
         freq <- as.data.frame(table(x), stringsAsFactors = FALSE)
         names(freq) <- c("Level", "Count")
         freq <- freq[order(-freq$Count), ]
         if (nrow(freq) > 20) freq <- freq[1:20, ]
         freq$Level <- factor(freq$Level, levels = rev(freq$Level))
-        ggplot(freq, aes(x = Level, y = Count)) +
-          geom_col(fill = "#4e79a7", alpha = 0.8) +
-          coord_flip() +
-          labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
-          theme_minimal(base_size = 14)
+        ggplot2::ggplot(freq, ggplot2::aes(x = Level, y = Count)) +
+          ggplot2::geom_col(fill = "#4e79a7", alpha = 0.8) +
+          ggplot2::coord_flip() +
+          ggplot2::labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
+          ggplot2::theme_minimal(base_size = 14)
       }
     })
 
     output$missing_plot <- renderPlot({
       req(shared$data)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       df <- shared$data
       miss_df <- data.frame(
         Variable = names(df),
@@ -355,12 +374,12 @@ explore_server <- function(id, shared) {
       miss_df <- miss_df[order(-miss_df$Pct_Missing), ]
       miss_df$Variable <- factor(miss_df$Variable, levels = rev(miss_df$Variable))
 
-      ggplot(miss_df, aes(x = Variable, y = Pct_Missing)) +
-        geom_col(fill = ifelse(miss_df$Pct_Missing > 0, "#e15759", "#76b7b2"), alpha = 0.8) +
-        coord_flip() +
-        labs(title = "Missing Data by Variable", x = "", y = "% Missing") +
-        theme_minimal(base_size = 14) +
-        geom_hline(yintercept = c(5, 20), linetype = "dashed", color = "grey50")
+      ggplot2::ggplot(miss_df, ggplot2::aes(x = Variable, y = Pct_Missing)) +
+        ggplot2::geom_col(fill = ifelse(miss_df$Pct_Missing > 0, "#e15759", "#76b7b2"), alpha = 0.8) +
+        ggplot2::coord_flip() +
+        ggplot2::labs(title = "Missing Data by Variable", x = "", y = "% Missing") +
+        ggplot2::theme_minimal(base_size = 14) +
+        ggplot2::geom_hline(yintercept = c(5, 20), linetype = "dashed", color = "grey50")
     })
 
     output$missing_table <- renderTable({
@@ -380,7 +399,6 @@ explore_server <- function(id, shared) {
     output$label_editor <- renderUI({
       req(shared$data)
       vars <- names(shared$data)
-      # Show first 15 variables with text inputs for labels
       vars_show <- head(vars, 15)
       label_inputs <- lapply(vars_show, function(v) {
         current_label <- ""
@@ -439,7 +457,7 @@ table1_ui <- function(id) {
           actionButton(ns("generate"), "Generate Table 1",
                        class = "btn-primary"),
           br(), br(),
-          actionButton(ns("export_html"), "Copy HTML to clipboard",
+          actionButton(ns("export_html"), "Copy table to clipboard",
                        class = "btn-outline-secondary btn-sm")
         )
       ),
@@ -481,10 +499,15 @@ table1_server <- function(id, shared) {
 
       by_var <- if (nchar(input$by_var) > 0) input$by_var else NULL
 
-      # Build subset
+      # Build subset and apply variable type detection
       cols <- selected_vars
       if (!is.null(by_var) && !(by_var %in% cols)) cols <- c(cols, by_var)
       df_sub <- shared$data[, cols, drop = FALSE]
+
+      # Convert detected categoricals to factor
+      if (!is.null(shared$var_types)) {
+        df_sub <- prepare_model_data(df_sub, shared$var_types)
+      }
 
       # Ensure stratification variable is factor
       if (!is.null(by_var)) {
@@ -520,9 +543,9 @@ table1_server <- function(id, shared) {
         if (requireNamespace("gt", quietly = TRUE)) {
           gt_tbl <- gtsummary::as_gt(tbl)
           html_str <- gt::as_raw_html(gt_tbl)
-          HTML(html_str)
+          # Wrap in a div with an id for clipboard copy
+          HTML(paste0('<div id="', ns("table1_html"), '">', html_str, '</div>'))
         } else {
-          # Fallback: text output
           HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
         }
       }, error = function(e) {
@@ -536,14 +559,8 @@ table1_server <- function(id, shared) {
         showNotification("Generate a table first", type = "warning")
         return()
       }
-      tryCatch({
-        gt_tbl <- gtsummary::as_gt(tbl)
-        html_str <- gt::as_raw_html(gt_tbl)
-        shared$last_export <- list(type = "table1", content = html_str)
-        showNotification("Table HTML ready for export (see Results tab)", type = "message")
-      }, error = function(e) {
-        showNotification(paste("Export error:", conditionMessage(e)), type = "error")
-      })
+      # Use JS to copy the rendered table HTML to clipboard
+      session$sendCustomMessage("copyTableToClipboard", ns("table1_html"))
     })
   })
 }
@@ -568,6 +585,7 @@ model_ui <- function(id) {
             "Mixed model (Experimental)" = "lmer"
           )),
           checkboxGroupInput(ns("predictors"), "Predictor variables:", choices = NULL),
+          uiOutput(ns("predictor_types_info")),
           hr(),
           conditionalPanel(
             condition = paste0("input['", ns("model_type"), "'] == 'cox'"),
@@ -589,7 +607,10 @@ model_ui <- function(id) {
           ),
           checkboxInput(ns("show_vif"), "Show VIF (multicollinearity)", value = FALSE),
           hr(),
-          actionButton(ns("fit_model"), "Fit Model", class = "btn-primary")
+          actionButton(ns("fit_model"), "Fit Model", class = "btn-primary"),
+          br(), br(),
+          actionButton(ns("copy_results"), "Copy table to clipboard",
+                       class = "btn-outline-secondary btn-sm")
         )
       ),
       column(8,
@@ -625,6 +646,23 @@ model_server <- function(id, shared) {
       updateSelectInput(session, "cluster_var", choices = vars)
     })
 
+    # Show detected types for selected predictors
+    output$predictor_types_info <- renderUI({
+      req(shared$data, input$predictors, shared$var_types)
+      vt <- shared$var_types
+      preds <- input$predictors
+      if (length(preds) == 0) return(NULL)
+      info <- sapply(preds, function(v) {
+        detected <- if (v %in% vt$variable) vt$type[vt$variable == v] else "unknown"
+        paste0(v, " [", detected, "]")
+      })
+      p(class = "text-muted small",
+        strong("Detected types: "),
+        paste(info, collapse = ", "),
+        br(),
+        "Categorical variables will be auto-converted to factors.")
+    })
+
     model_fit <- reactiveVal(NULL)
     model_tidy <- reactiveVal(NULL)
 
@@ -645,14 +683,22 @@ model_server <- function(id, shared) {
         return()
       }
 
+      # Prepare data: convert detected categoricals to factor
       df <- shared$data
+      if (!is.null(shared$var_types)) {
+        df <- prepare_model_data(df, shared$var_types)
+      }
+
       formula_str <- paste(outcome, "~", paste(preds, collapse = " + "))
 
       tryCatch({
         mod <- switch(input$model_type,
           "lm" = lm(as.formula(formula_str), data = df),
           "glm" = {
-            df[[outcome]] <- as.numeric(as.factor(df[[outcome]])) - 1
+            # For logistic: ensure outcome is 0/1
+            if (!is.numeric(df[[outcome]]) || !all(na.omit(df[[outcome]]) %in% c(0, 1))) {
+              df[[outcome]] <- as.numeric(as.factor(df[[outcome]])) - 1
+            }
             glm(as.formula(formula_str), data = df, family = binomial)
           },
           "cox" = {
@@ -733,20 +779,31 @@ model_server <- function(id, shared) {
       if (requireNamespace("gt", quietly = TRUE)) {
         tryCatch({
           gt_tbl <- gt::gt(display_df) |>
-            gt::tab_header(title = paste("Regression Results —",
+            gt::tab_header(title = paste("Regression Results",
               switch(input$model_type,
-                "lm" = "Linear Regression",
-                "glm" = "Logistic Regression",
-                "cox" = "Cox Proportional Hazards",
-                "lmer" = "Mixed Model"
+                "lm" = "- Linear Regression",
+                "glm" = "- Logistic Regression",
+                "cox" = "- Cox Proportional Hazards",
+                "lmer" = "- Mixed Model"
               )))
-          HTML(gt::as_raw_html(gt_tbl))
+          # Wrap with id for clipboard
+          HTML(paste0('<div id="', ns("model_results_html"), '">',
+                      gt::as_raw_html(gt_tbl), '</div>'))
         }, error = function(e) {
           HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
         })
       } else {
         HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
       }
+    })
+
+    # Copy regression results to clipboard
+    observeEvent(input$copy_results, {
+      if (is.null(model_tidy())) {
+        showNotification("Fit a model first", type = "warning")
+        return()
+      }
+      session$sendCustomMessage("copyTableToClipboard", ns("model_results_html"))
     })
 
     output$diagnostics_output <- renderUI({
@@ -787,9 +844,10 @@ model_server <- function(id, shared) {
       if (input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("emmeans", quietly = TRUE)) {
           tryCatch({
-            # Find factor predictors
             preds <- input$predictors
-            factor_preds <- preds[sapply(shared$data[preds], function(x) !is.numeric(x) || length(unique(x)) <= 5)]
+            factor_preds <- preds[sapply(shared$data[preds], function(x) {
+              is.factor(x) || is.character(x) || (is.numeric(x) && length(unique(na.omit(x))) <= 10)
+            })]
             if (length(factor_preds) > 0) {
               emm <- emmeans::emmeans(mod, factor_preds[1])
               emm_df <- as.data.frame(summary(emm))
@@ -814,12 +872,11 @@ model_server <- function(id, shared) {
     output$forest_plot <- renderPlot({
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
 
-      # Forest plot of coefficients
       plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
       if (nrow(plot_df) == 0) return(NULL)
 
-      # Use OR/HR if available, otherwise raw estimates
       if ("OR_HR" %in% names(plot_df)) {
         plot_df$est <- plot_df$OR_HR
         plot_df$lo <- plot_df$ci_lower
@@ -836,12 +893,12 @@ model_server <- function(id, shared) {
 
       plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
 
-      ggplot(plot_df, aes(x = est, y = term)) +
-        geom_point(size = 3, color = "#4e79a7") +
-        geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
-        geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
-        labs(title = "Forest Plot", x = x_label, y = "") +
-        theme_minimal(base_size = 14)
+      ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+        ggplot2::geom_point(size = 3, color = "#4e79a7") +
+        ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
+        ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
+        ggplot2::labs(title = "Forest Plot", x = x_label, y = "") +
+        ggplot2::theme_minimal(base_size = 14)
     })
   })
 }
@@ -901,12 +958,11 @@ causal_server <- function(id, shared) {
       updateSelectInput(session, "outcome_var", choices = vars)
     })
 
-    # Dynamic covariate role assignment
     output$covariate_roles <- renderUI({
       req(shared$data, input$exposure, input$outcome_var)
       other_vars <- setdiff(names(shared$data), c(input$exposure, input$outcome_var))
       if (length(other_vars) == 0) return(p("No other variables"))
-      other_vars <- head(other_vars, 10)  # limit to 10
+      other_vars <- head(other_vars, 10)
 
       lapply(other_vars, function(v) {
         selectInput(ns(paste0("role_", v)), label = v,
@@ -933,8 +989,6 @@ causal_server <- function(id, shared) {
       other_vars <- setdiff(names(shared$data), c(input$exposure, input$outcome_var))
       other_vars <- head(other_vars, 10)
 
-      # Build dagify formula list
-      # outcome ~ exposure always
       formulas <- list()
       formulas[[1]] <- as.formula(paste(input$outcome_var, "~", input$exposure))
 
@@ -943,19 +997,15 @@ causal_server <- function(id, shared) {
         if (is.null(role) || role == "none") next
 
         if (role == "confounder") {
-          # Confounder -> exposure and confounder -> outcome
           formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
           formulas[[length(formulas) + 1]] <- as.formula(paste(input$outcome_var, "~", v))
         } else if (role == "mediator") {
-          # exposure -> mediator -> outcome
           formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$exposure))
           formulas[[length(formulas) + 1]] <- as.formula(paste(input$outcome_var, "~", v))
         } else if (role == "collider") {
-          # exposure -> collider <- outcome
           formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$exposure))
           formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$outcome_var))
         } else if (role == "instrument") {
-          # instrument -> exposure
           formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
         } else if (role == "ancestor_exp") {
           formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
@@ -988,14 +1038,15 @@ causal_server <- function(id, shared) {
       tryCatch({
         ggdag::ggdag_status(dag) +
           ggdag::theme_dag() +
-          labs(title = "Directed Acyclic Graph (DAG)")
+          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
       }, error = function(e) {
         ggdag::ggdag(dag) +
           ggdag::theme_dag() +
-          labs(title = "Directed Acyclic Graph (DAG)")
+          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
       })
     })
 
+    # Compute adjustment sets via dagitty backend
     output$adjustment_info <- renderUI({
       dag <- dag_obj()
       if (is.null(dag)) {
@@ -1003,14 +1054,14 @@ causal_server <- function(id, shared) {
       }
 
       tryCatch({
-        adj_sets <- ggdag::dagify_adjust <- ggdag::ggdag_adjustment_set(dag)
+        # Use dagitty::adjustmentSets on the underlying dagitty object
+        dagitty_obj <- dag$dag
+        adj <- dagitty::adjustmentSets(dagitty_obj)
 
-        # Get adjustment set
-        adj <- ggdag::dag_adjustment_sets(dag)
         if (length(adj) == 0) {
           return(tagList(
             h5("Minimal Sufficient Adjustment Set"),
-            p("No adjustment needed — the causal effect is already identified",
+            p("No adjustment needed -- the causal effect is already identified",
               "without conditioning on any covariates."),
             p(class = "text-muted small",
               "This may occur when there are no backdoor paths between",
@@ -1050,7 +1101,7 @@ causal_server <- function(id, shared) {
                   "Adjust only if you want the direct effect."),
           tags$dt("Collider"),
           tags$dd("A variable caused by both the exposure and outcome.",
-                  "Do NOT adjust for colliders — conditioning on a collider",
+                  "Do NOT adjust for colliders -- conditioning on a collider",
                   "introduces spurious association (collider bias)."),
           tags$dt("Instrument"),
           tags$dd("A variable that affects the exposure but has no direct effect",
@@ -1102,28 +1153,14 @@ results_ui <- function(id) {
                 p("Click below to download a markdown report with all results."),
                 actionButton(ns("download_report"), "Download Report (.md)",
                              class = "btn-primary"),
+                actionButton(ns("preview_report"), "Preview Report",
+                             class = "btn-outline-secondary"),
                 hr(),
                 h5("Results Preview"),
                 tags$textarea(id = ns("report_text"), rows = 20,
                   style = "width:100%; font-family:monospace; font-size:12px;",
                   readonly = "readonly",
-                  "Generate Table 1 or fit a model, then come here to export."),
-                tags$script(HTML(sprintf("
-                  Shiny.addCustomMessageHandler('%s-downloadReport', function(msg) {
-                    var blob = new Blob([msg.content], {type: 'text/markdown'});
-                    var url = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = url;
-                    a.download = msg.filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  });
-                  Shiny.addCustomMessageHandler('%s-updateReport', function(msg) {
-                    document.getElementById('%s').value = msg;
-                  });
-                ", ns(""), ns(""), ns("report_text"))))
+                  "Click 'Preview Report' to see results here.")
               )
             )
           )
@@ -1141,8 +1178,12 @@ results_server <- function(id, shared) {
       tbl <- shared$table1
       if (is.null(tbl)) return(p(class = "text-muted", "No Table 1 generated yet. Go to Step 3."))
       tryCatch({
-        gt_tbl <- gtsummary::as_gt(tbl)
-        HTML(gt::as_raw_html(gt_tbl))
+        if (requireNamespace("gt", quietly = TRUE)) {
+          gt_tbl <- gtsummary::as_gt(tbl)
+          HTML(gt::as_raw_html(gt_tbl))
+        } else {
+          HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
+        }
       }, error = function(e) {
         HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
       })
@@ -1160,9 +1201,13 @@ results_server <- function(id, shared) {
                                    round(display_df$p.value, 4))
 
       tryCatch({
-        gt_tbl <- gt::gt(display_df) |>
-          gt::tab_header(title = paste("Regression Results"))
-        HTML(gt::as_raw_html(gt_tbl))
+        if (requireNamespace("gt", quietly = TRUE)) {
+          gt_tbl <- gt::gt(display_df) |>
+            gt::tab_header(title = "Regression Results")
+          HTML(gt::as_raw_html(gt_tbl))
+        } else {
+          HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
+        }
       }, error = function(e) {
         HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
       })
@@ -1178,7 +1223,7 @@ results_server <- function(id, shared) {
       tryCatch({
         ggdag::ggdag_status(dag) +
           ggdag::theme_dag() +
-          labs(title = "Directed Acyclic Graph (DAG)")
+          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
       }, error = function(e) {
         ggdag::ggdag(dag) + ggdag::theme_dag()
       })
@@ -1189,7 +1234,7 @@ results_server <- function(id, shared) {
         "# Statistical Analysis Report",
         "",
         paste0("**Generated:** ", Sys.time()),
-        paste0("**Data:** ", shared$data_name %||% "Unknown"),
+        paste0("**Data:** ", if (!is.null(shared$data_name)) shared$data_name else "Unknown"),
         paste0("**R Version:** ", R.version.string),
         "",
         "---",
@@ -1198,12 +1243,10 @@ results_server <- function(id, shared) {
         ""
       )
 
-      # Data summary
       if (!is.null(shared$data)) {
         df <- shared$data
         lines <- c(lines,
-          "## Data Summary",
-          "",
+          "## Data Summary", "",
           paste0("- **Rows:** ", nrow(df)),
           paste0("- **Columns:** ", ncol(df)),
           paste0("- **Numeric variables:** ", sum(sapply(df, is.numeric))),
@@ -1212,33 +1255,27 @@ results_server <- function(id, shared) {
         )
       }
 
-      # Table 1
       if (!is.null(shared$table1)) {
         lines <- c(lines,
-          "## Table 1: Descriptive Statistics",
-          "",
+          "## Table 1: Descriptive Statistics", "",
           paste(capture.output(print(shared$table1)), collapse = "\n"),
           ""
         )
       }
 
-      # Regression
       if (!is.null(shared$model_result)) {
         lines <- c(lines,
-          "## Regression Results",
-          "",
-          paste0("**Model type:** ", shared$model_result$type),
-          "",
+          "## Regression Results", "",
+          paste0("**Model type:** ", shared$model_result$type), "",
           "| Term | Estimate | Std.Error | Statistic | P-value |",
           "|------|----------|-----------|-----------|---------|"
         )
         tidy_df <- shared$model_result$tidy
         for (i in seq_len(nrow(tidy_df))) {
           row <- tidy_df[i, ]
+          pval <- if (row$p.value < 0.001) "<0.001" else as.character(round(row$p.value, 4))
           lines <- c(lines, sprintf("| %s | %.4f | %.4f | %.3f | %s |",
-            row$term, row$estimate, row$std.error, row$statistic,
-            if (row$p.value < 0.001) "<0.001" else round(row$p.value, 4)
-          ))
+            row$term, row$estimate, row$std.error, row$statistic, pval))
         }
         lines <- c(lines, "")
       }
@@ -1246,13 +1283,21 @@ results_server <- function(id, shared) {
       paste(lines, collapse = "\n")
     }
 
+    # Preview report in textarea
+    observeEvent(input$preview_report, {
+      md <- generate_report()
+      session$sendCustomMessage("updateReportText",
+        list(id = ns("report_text"), text = md))
+    })
+
+    # Download report
     observeEvent(input$download_report, {
       md <- generate_report()
-      session$sendCustomMessage(paste0(ns(""), "downloadReport"), list(
-        content = md,
-        filename = paste0("analysis_report_", Sys.Date(), ".md")
-      ))
-      session$sendCustomMessage(paste0(ns(""), "updateReport"), md)
+      session$sendCustomMessage("downloadMarkdown",
+        list(content = md, filename = paste0("analysis_report_", Sys.Date(), ".md")))
+      # Also update the preview
+      session$sendCustomMessage("updateReportText",
+        list(id = ns("report_text"), text = md))
     })
   })
 }
@@ -1263,10 +1308,9 @@ results_server <- function(id, shared) {
 # =============================================================================
 
 ui <- fluidPage(
-  theme = NULL,  # Use default Shiny theme for Shinylive compatibility
+  theme = NULL,
   tags$head(
     tags$style(HTML("
-      .navbar { margin-bottom: 0; }
       .step-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 15px 20px; margin-bottom: 15px;
@@ -1303,7 +1347,91 @@ ui <- fluidPage(
       .card-header { background-color: #f8f9fa; padding: 10px 15px; border-bottom: 1px solid #dee2e6; }
       .card-body { padding: 15px; }
       .well { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; }
+      #loading-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(255,255,255,0.95); z-index: 9999;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+      }
+      #loading-overlay h2 { color: #667eea; margin-bottom: 20px; }
+      #loading-overlay .progress-bar-container {
+        width: 400px; max-width: 80%; height: 24px;
+        background: #e9ecef; border-radius: 12px; overflow: hidden;
+      }
+      #loading-overlay .progress-bar-fill {
+        height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 12px; transition: width 0.3s ease;
+        width: 0%;
+      }
+      #loading-overlay .progress-text {
+        margin-top: 10px; color: #6c757d; font-size: 14px;
+      }
+    ")),
+    # JS handlers for clipboard, download, and loading screen
+    tags$script(HTML("
+      // Copy table HTML to clipboard
+      Shiny.addCustomMessageHandler('copyTableToClipboard', function(elementId) {
+        var el = document.getElementById(elementId);
+        if (!el) {
+          alert('No table to copy. Generate results first.');
+          return;
+        }
+        // Copy as rich HTML (for pasting into Word/Docs)
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        try {
+          document.execCommand('copy');
+          sel.removeAllRanges();
+        } catch(e) {
+          // Fallback: copy as plain text
+          navigator.clipboard.writeText(el.innerText);
+        }
+      });
+
+      // Download markdown file
+      Shiny.addCustomMessageHandler('downloadMarkdown', function(msg) {
+        var blob = new Blob([msg.content], {type: 'text/markdown'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = msg.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Update report textarea
+      Shiny.addCustomMessageHandler('updateReportText', function(msg) {
+        var el = document.getElementById(msg.id);
+        if (el) el.value = msg.text;
+      });
+
+      // Loading progress updates
+      Shiny.addCustomMessageHandler('updateLoadingProgress', function(msg) {
+        var bar = document.querySelector('#loading-overlay .progress-bar-fill');
+        var text = document.querySelector('#loading-overlay .progress-text');
+        if (bar) bar.style.width = msg.pct + '%';
+        if (text) text.textContent = msg.message;
+      });
+      Shiny.addCustomMessageHandler('hideLoadingOverlay', function(msg) {
+        var overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'none';
+      });
     "))
+  ),
+
+  # Loading overlay (shown until packages are installed)
+  div(id = "loading-overlay",
+    h2("Statistical Analysis"),
+    p("Initializing R environment in your browser..."),
+    div(class = "progress-bar-container",
+      div(class = "progress-bar-fill")
+    ),
+    p(class = "progress-text", "Loading WebR runtime...")
   ),
 
   # Privacy banner
@@ -1405,6 +1533,30 @@ server <- function(input, output, session) {
     dag = NULL,
     last_export = NULL
   )
+
+  # --- Package installation with progress ------------------------------------
+  # Install packages in server so we can show progress to the user
+  observe({
+    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+              "survival", "sandwich", "lmtest", "car", "emmeans",
+              "haven", "readxl", "writexl", "lme4", "ggdag")
+    total <- length(pkgs)
+
+    for (i in seq_along(pkgs)) {
+      pct <- round(100 * i / total)
+      session$sendCustomMessage("updateLoadingProgress", list(
+        pct = pct,
+        message = paste0("Installing ", pkgs[i], " (", i, "/", total, ") ... ", pct, "%")
+      ))
+      install_if_needed(pkgs[i])
+    }
+
+    session$sendCustomMessage("updateLoadingProgress", list(
+      pct = 100,
+      message = "All packages loaded. Ready!"
+    ))
+    session$sendCustomMessage("hideLoadingOverlay", list())
+  }) |> bindEvent(TRUE, once = TRUE)
 
   # Current step tracker
   current_step <- reactiveVal(1)
