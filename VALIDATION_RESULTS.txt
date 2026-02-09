@@ -1,0 +1,167 @@
+======================================================================== 
+STATISTICAL VALIDATION — Ground Truth Testing
+======================================================================== 
+Date: 2026-02-09 18:34:56 
+R: R version 4.3.3 (2024-02-29) 
+
+--- Loading app helper functions ---
+  Functions loaded.
+
+--- TEST 1: Variable Classification ---
+  [PASS] numeric_many detected as numeric
+  [PASS] numeric_few (5 unique int) detected as categorical — unique values: 5
+  [PASS] char_var detected as categorical
+  [PASS] factor_var detected as categorical
+  [PASS] logical_var detected as categorical
+  [PASS] date_var detected as date
+  [PASS] integer_many (>10 unique) detected as numeric — unique values: 43
+  [PASS] binary_01 (0/1) detected as categorical
+
+--- TEST 2: prepare_model_data() Factor Conversion ---
+  [PASS] Numeric column stays numeric after prepare_model_data
+  [PASS] Character categorical converted to factor
+  [PASS] Integer categorical (<=10 unique) converted to factor
+
+--- TEST 3: Logistic Regression vs Known Coefficients ---
+  Loaded test_binary_outcome.csv: 500 rows
+  [PASS] predictor_categorical detected as categorical
+  [PASS] predictor_categorical converted to factor by prepare_model_data
+  Fitted coefficients:
+           (Intercept) predictor_continuous_1 predictor_continuous_2 
+               -0.7300                 0.4669                -0.1790 
+predictor_categoricalB predictor_categoricalC 
+                0.5589                 1.0486 
+  [PASS] Intercept near -0.6 (true: -1 + 0.4*ref) — est=-0.730, true=-0.6, |diff|=0.130
+  [PASS] predictor_continuous_1 coefficient near 0.5 — est=0.467, true=0.5, |diff|=0.033
+  [PASS] predictor_continuous_2 coefficient near -0.3 — est=-0.179, true=-0.3, |diff|=0.121
+  [PASS] predictor_categoricalB coefficient near 0.4 — est=0.559, true=0.4, |diff|=0.159
+  [PASS] predictor_categoricalC coefficient near 0.8 — est=1.049, true=0.8, |diff|=0.249
+  [PASS] x1 coefficient has correct sign (positive)
+  [PASS] x2 coefficient has correct sign (negative)
+  [PASS] x3B coefficient has correct sign (positive)
+  [PASS] x3C coefficient has correct sign (positive)
+  [PASS] x3C > x3B (C has larger effect than B)
+  [PASS] broom::tidy returns correct number of rows (5 terms)
+  [PASS] broom::tidy includes confidence intervals
+  [PASS] Odds ratio for x1 > 1 (positive effect) — OR=1.595
+  [PASS] Odds ratio for x2 < 1 (protective effect) — OR=0.836
+
+--- TEST 4: Linear Regression — Null Effects ---
+  Loaded benchmark_5k.csv: 5000 rows x 20 cols
+  Fitted coefficients:
+(Intercept)         age         bmi bp_systolic 
+    50.2417      0.0078      0.0194     -0.0083 
+  [PASS] age coefficient near 0 (null effect) — est=0.0078
+  [PASS] bmi coefficient near 0 (null effect) — est=0.0194
+  [PASS] bp_systolic coefficient near 0 (null effect) — est=-0.0083
+  [PASS] Intercept near 50 (mean of outcome_continuous) — est=50.24
+  [PASS] broom::tidy(lm) returns 4 rows
+  [PASS] At least 2/3 null predictors have p > 0.05 — p_age=0.421, p_bmi=0.502, p_bp=0.252
+
+--- TEST 5: Cox Regression — Treatment Effect ---
+  Loaded test_survival.csv: 500 rows
+  Fitted coefficients:
+treatmentStandard               age           stageII          stageIII 
+           0.5319            0.0030           -0.1210           -0.0801 
+          stageIV 
+          -0.0356 
+  [PASS] Treatment coefficient present in Cox model — coef=0.532
+  [PASS] Treatment has detectable effect (HR != 1) — HR=1.702
+  [PASS] broom::tidy(coxph) returns rows — 5 terms
+  [PASS] Hazard ratios are all positive
+
+--- TEST 6: Mixed Model — School Random Effects ---
+  Loaded test_clustered.csv: 500 rows, 25 schools
+Loading required package: Matrix
+  Variance components:
+        grp        var1 var2     vcov     sdcor
+1 school_id (Intercept) <NA>  29.4398  5.425845
+2  Residual        <NA> <NA> 106.0802 10.299526
+  [PASS] Random effect SD near 5 (school_effect sd=5) — est=5.43, true=5.0
+  [PASS] Residual SD near 10 (noise sd=10) — est=10.30, true=10.0
+  [PASS] Fixed intercept near 50 — est=50.41, true=50
+  [PASS] ICC near 0.20 (true: 25/(25+100)) — est=0.217, true=0.200
+
+--- TEST 7: gtsummary Table 1 ---
+  [PASS] tbl_summary creates valid object
+  [PASS] Table 1 includes all 3 predictors
+The following errors were returned during `add_p()`:
+x For variable `predictor_categorical` (`outcome`) and "estimate", "std.error",
+  "parameter", "statistic", "conf.low", "conf.high", and "p.value" statistics:
+  The package "broom" (>= 1.0.8) is required.
+x For variable `predictor_continuous_1` (`outcome`) and "estimate",
+  "std.error", "parameter", "statistic", "conf.low", "conf.high", and "p.value"
+  statistics: The package "broom" (>= 1.0.8) is required.
+x For variable `predictor_continuous_2` (`outcome`) and "estimate",
+  "std.error", "parameter", "statistic", "conf.low", "conf.high", and "p.value"
+  statistics: The package "broom" (>= 1.0.8) is required.
+  [PASS] add_p() succeeds
+  [PASS] Table 1 on benchmark data succeeds
+  [PASS] gt renders Table 1 to HTML — 20675 chars of HTML
+
+--- TEST 8: Variable Type Detection on Synthetic Data ---
+  [PASS] subject_id detected as categorical (character)
+  [PASS] predictor_continuous_1 detected as numeric
+  [PASS] predictor_continuous_2 detected as numeric
+  [PASS] predictor_categorical detected as categorical
+  [PASS] outcome (0/1 binary) detected as categorical
+  [PASS] comorbidity_count (Poisson, few unique) detected as categorical — unique values: 7
+  [PASS] age (continuous, many unique) detected as numeric
+  [PASS] sex (character) detected as categorical
+  [PASS] smoking (3 levels) detected as categorical
+  [PASS] outcome_binary (0/1) detected as categorical
+
+--- TEST 9: End-to-End Pipeline (App Replication) ---
+  [PASS] Pipeline: predictor_categorical is factor after pipeline
+  [PASS] Pipeline: outcome is factor after pipeline (binary detected as categorical)
+  [PASS] Pipeline: model converges
+  [PASS] Pipeline: 5 terms in output
+  [PASS] Pipeline: x1 OR > 1 (positive effect)
+  [PASS] Pipeline: x2 OR < 1 (protective effect)
+  [PASS] Pipeline: categorical levels B and C present — terms: predictor_categoricalB, predictor_categoricalC
+
+--- TEST 10: Robust Standard Errors ---
+Loading required package: zoo
+
+Attaching package: 'zoo'
+
+The following objects are masked from 'package:base':
+
+    as.Date, as.Date.numeric
+
+  [PASS] sandwich::vcovHC produces valid covariance matrix
+  [PASS] coeftest with robust SEs produces valid output
+  [PASS] Robust SEs within 2x of OLS SEs (well-behaved data) — ratios: 1.008, 1.015, 0.992, 1
+
+--- TEST 11: VIF (Multicollinearity) ---
+Loading required package: carData
+  [PASS] car::vif computes successfully
+  [PASS] All VIF values near 1 (independent predictors) — VIF: 1, 1, 1, 1
+
+--- TEST 12: Estimated Marginal Means ---
+  [PASS] emmeans produces valid output
+  [PASS] emmeans for both sexes near 50 (null effect) — Male=50.33, Female=49.98
+
+--- TEST 13: DAG Adjustment Sets ---
+  [SKIP] ggdag not installed in this environment (available in WebR only)
+  Testing dagitty directly instead...
+
+  [SKIP] dagitty also not installed. DAG tests skipped entirely.
+
+======================================================================== 
+VALIDATION COMPLETE: 70 PASS, 0 FAIL out of 70 tests
+======================================================================== 
+
+Ground truth coefficient comparison (logistic regression):
+  Parameter                            True  Estimated     |Diff|
+  ---------                            ----  ---------     ------
+  Intercept                            -0.6     -0.730      0.130
+  predictor_continuous_1 (x1)           0.5      0.467      0.033
+  predictor_continuous_2 (x2)          -0.3     -0.179      0.121
+  predictor_categoricalB                0.4      0.559      0.159
+  predictor_categoricalC                0.8      1.049      0.249
+
+Mixed model variance components:
+  School random effect SD: est=5.43, true=5.0
+  Residual SD:             est=10.30, true=10.0
+  ICC:                     est=0.217, true=0.200

@@ -695,7 +695,10 @@ model_server <- function(id, shared) {
         mod <- switch(input$model_type,
           "lm" = lm(as.formula(formula_str), data = df),
           "glm" = {
-            # For logistic: ensure outcome is 0/1
+            # For logistic: ensure outcome is numeric 0/1
+            if (is.factor(df[[outcome]])) {
+              df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+            }
             if (!is.numeric(df[[outcome]]) || !all(na.omit(df[[outcome]]) %in% c(0, 1))) {
               df[[outcome]] <- as.numeric(as.factor(df[[outcome]])) - 1
             }
@@ -704,6 +707,13 @@ model_server <- function(id, shared) {
           "cox" = {
             req(input$time_var, input$event_var)
             if (!requireNamespace("survival", quietly = TRUE)) stop("survival not available")
+            # Ensure time and event variables are numeric (not factor)
+            if (is.factor(df[[input$time_var]])) {
+              df[[input$time_var]] <- as.numeric(as.character(df[[input$time_var]]))
+            }
+            if (is.factor(df[[input$event_var]])) {
+              df[[input$event_var]] <- as.numeric(as.character(df[[input$event_var]]))
+            }
             surv_formula <- as.formula(paste(
               "survival::Surv(", input$time_var, ",", input$event_var, ") ~",
               paste(preds, collapse = " + ")
