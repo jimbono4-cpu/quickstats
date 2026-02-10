@@ -938,6 +938,94 @@ results_ui <- function(id) {
               tabPanel("Regression",
                 uiOutput(ns("show_regression"))
               ),
+              tabPanel("Methods & Results Draft",
+                h5("Automated Methods & Results Drafting"),
+                p(class = "text-muted small",
+                  "Generate a structured prompt for an LLM to draft publication-style",
+                  "Methods and Results sections. Complete the study information below,",
+                  "then click 'Generate Prompt'. Copy the prompt into ChatGPT, Claude,",
+                  "or another LLM."),
+                div(class = "privacy-banner", style = "margin: 10px 0;",
+                  "No individual-level data is included in the prompt.",
+                  "Only aggregate statistics and model results are used."),
+                hr(),
+                # --- Study Information Form ---
+                h5("Study Information"),
+                p(class = "text-muted small",
+                  "Provide information that cannot be inferred from the data alone."),
+                fluidRow(
+                  column(6,
+                    selectInput(ns("study_design"), "1. Study Design:",
+                      choices = c("(select)" = "",
+                        "Randomised controlled trial" = "Randomised controlled trial",
+                        "Cluster randomised trial" = "Cluster randomised trial",
+                        "Cohort study" = "Cohort study",
+                        "Cross-sectional study" = "Cross-sectional study",
+                        "Case-control study" = "Case-control study",
+                        "Interrupted time series" = "Interrupted time series",
+                        "Quasi-experimental study" = "Quasi-experimental study",
+                        "Other" = "Other")),
+                    conditionalPanel(
+                      condition = paste0("input['", ns("study_design"), "'] == 'Other'"),
+                      textInput(ns("study_design_other"), "Specify design:", placeholder = "e.g. Ecological study")
+                    )
+                  ),
+                  column(6,
+                    textAreaInput(ns("study_setting"), "2. Study Setting:",
+                      placeholder = "Country/region, healthcare/educational/community setting, time period of data collection",
+                      rows = 3)
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    textAreaInput(ns("participants"), "3. Participants:",
+                      placeholder = "Inclusion criteria, exclusion criteria, eligibility restrictions",
+                      rows = 3)
+                  ),
+                  column(6,
+                    textAreaInput(ns("timepoints"), "4. Timepoint Definitions:",
+                      placeholder = "Baseline definition, follow-up timepoints, primary analysis timepoint",
+                      rows = 3)
+                  )
+                ),
+                fluidRow(
+                  column(12,
+                    textAreaInput(ns("outcome_defs"), "5. Outcome Definitions:",
+                      placeholder = paste(
+                        "For each outcome, provide:",
+                        "- Outcome name (as used in manuscript)",
+                        "- Type (continuous, binary, count, time-to-event)",
+                        "- Measurement instrument or source",
+                        "- Direction of effect (higher = better/worse)",
+                        "- Primary vs secondary designation",
+                        sep = "\n"),
+                      rows = 4)
+                  )
+                ),
+                hr(),
+                fluidRow(
+                  column(6,
+                    actionButton(ns("generate_prompt"), "Generate LLM Prompt",
+                                 class = "btn-primary"),
+                    actionButton(ns("copy_prompt"), "Copy Prompt to Clipboard",
+                                 class = "btn-outline-secondary")
+                  ),
+                  column(6,
+                    p(class = "text-muted small", style = "margin-top: 8px;",
+                      "The prompt includes your study info + analysis manifest.",
+                      "Paste it into your preferred LLM for a Methods & Results draft.")
+                  )
+                ),
+                hr(),
+                h5("Analysis Manifest (auto-captured)"),
+                uiOutput(ns("analysis_manifest_display")),
+                hr(),
+                h5("Generated Prompt"),
+                tags$textarea(id = ns("prompt_text"), rows = 25,
+                  style = "width:100%; font-family:monospace; font-size:11px;",
+                  readonly = "readonly",
+                  "Complete the study information form above and click 'Generate LLM Prompt'.")
+              ),
               tabPanel("Export",
                 h5("Download Report as PDF"),
                 p("Generate a print-ready report containing all your results.",
@@ -1004,7 +1092,276 @@ results_server <- function(id, shared) {
       })
     })
 
-    # Generate an HTML report string (for PDF via browser print)
+    # --- Analysis manifest builder ---
+    build_analysis_manifest <- function() {
+      manifest <- list()
+
+      # Data summary
+      if (!is.null(shared$data)) {
+        df <- shared$data
+        manifest$data <- list(
+          n_rows = nrow(df),
+          n_cols = ncol(df),
+          n_missing = sum(is.na(df)),
+          pct_missing = round(100 * sum(is.na(df)) / (nrow(df) * ncol(df)), 1),
+          variables = names(df)
+        )
+        if (!is.null(shared$var_types)) {
+          vt <- shared$var_types
+          manifest$data$n_numeric <- sum(vt$type == "numeric")
+          manifest$data$n_categorical <- sum(vt$type == "categorical")
+          manifest$data$var_types <- paste(
+            apply(vt, 1, function(r) paste0(r["variable"], " [", r["type"], "]")),
+            collapse = ", "
+          )
+        }
+      }
+
+      # Table 1
+      if (!is.null(shared$table1)) {
+        manifest$table1 <- paste(capture.output(print(shared$table1)), collapse = "\n")
+      }
+
+      # Regression model
+      if (!is.null(shared$model_result)) {
+        res <- shared$model_result
+        model_label <- switch(res$type,
+          "lm" = "Linear regression (OLS)",
+          "glm" = "Logistic regression (binomial, logit link)",
+          "cox" = "Cox proportional hazards regression",
+          "lmer" = "Linear mixed-effects model (REML)",
+          res$type)
+        tidy_df <- res$tidy
+        coef_table <- paste(capture.output(print(
+          data.frame(
+            Term = tidy_df$term,
+            Estimate = round(tidy_df$estimate, 4),
+            SE = round(tidy_df$std.error, 4),
+            Statistic = round(tidy_df$statistic, 3),
+            P = ifelse(tidy_df$p.value < 0.001, "<0.001", round(tidy_df$p.value, 4)),
+            CI_low = if ("conf.low" %in% names(tidy_df)) round(tidy_df$conf.low, 4) else NA,
+            CI_high = if ("conf.high" %in% names(tidy_df)) round(tidy_df$conf.high, 4) else NA,
+            stringsAsFactors = FALSE
+          ), row.names = FALSE
+        )), collapse = "\n")
+
+        # Add OR/HR if logistic or Cox
+        or_hr_text <- ""
+        if (res$type %in% c("glm", "cox") && "OR_HR" %in% names(tidy_df)) {
+          or_hr_text <- paste(capture.output(print(
+            data.frame(
+              Term = tidy_df$term,
+              OR_HR = round(tidy_df$OR_HR, 3),
+              CI_low = round(tidy_df$ci_lower, 3),
+              CI_high = round(tidy_df$ci_upper, 3),
+              stringsAsFactors = FALSE
+            ), row.names = FALSE
+          )), collapse = "\n")
+        }
+
+        manifest$model <- list(
+          type = model_label,
+          formula = if (!is.null(res$fit)) deparse(formula(res$fit)) else "Not captured",
+          coefficients = coef_table,
+          or_hr = or_hr_text
+        )
+      }
+
+      # Software
+      manifest$software <- list(
+        r_version = R.version.string,
+        packages = paste(
+          c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+            "survival", "sandwich", "lmtest", "car", "emmeans",
+            "haven", "readxl", "writexl", "lme4"),
+          collapse = ", "
+        ),
+        platform = "WebR (R compiled to WebAssembly, running in-browser)"
+      )
+
+      manifest
+    }
+
+    # Display the manifest
+    output$analysis_manifest_display <- renderUI({
+      manifest <- build_analysis_manifest()
+      items <- list()
+
+      if (!is.null(manifest$data)) {
+        items <- c(items, list(
+          p(strong("Data:"), manifest$data$n_rows, "observations,",
+            manifest$data$n_cols, "variables.",
+            manifest$data$n_numeric, "numeric,",
+            manifest$data$n_categorical, "categorical.",
+            manifest$data$n_missing, "missing values",
+            paste0("(", manifest$data$pct_missing, "%)."))
+        ))
+      }
+
+      if (!is.null(manifest$table1)) {
+        items <- c(items, list(
+          p(strong("Table 1:"), "Descriptive statistics generated via gtsummary.")
+        ))
+      }
+
+      if (!is.null(manifest$model)) {
+        items <- c(items, list(
+          p(strong("Model:"), manifest$model$type),
+          p(strong("Formula:"), tags$code(manifest$model$formula))
+        ))
+      }
+
+      items <- c(items, list(
+        p(strong("Software:"), manifest$software$r_version,
+          "via", manifest$software$platform)
+      ))
+
+      if (length(items) == 1) {
+        return(p(class = "text-muted", "Run some analyses first (Steps 3-4) to populate the manifest."))
+      }
+
+      tagList(items)
+    })
+
+    # Generate the LLM prompt
+    observeEvent(input$generate_prompt, {
+      manifest <- build_analysis_manifest()
+
+      # Get study info from form
+      design <- input$study_design
+      if (design == "Other" && nchar(trimws(input$study_design_other)) > 0) {
+        design <- trimws(input$study_design_other)
+      }
+      setting <- trimws(input$study_setting)
+      participants <- trimws(input$participants)
+      timepoints <- trimws(input$timepoints)
+      outcome_defs <- trimws(input$outcome_defs)
+
+      # Build prompt
+      prompt_lines <- c(
+        "# TASK: Draft Methods and Results Sections for a Peer-Reviewed Publication",
+        "",
+        "## MANDATORY INSTRUCTIONS",
+        "",
+        "- Use ONLY the information provided below.",
+        "- Do NOT invent, infer, assume, or embellish any methods, results, study characteristics, or interpretations.",
+        "- Do NOT introduce statistical methods, analyses, covariates, or outcomes that are not explicitly listed.",
+        "- Do NOT report values, sample sizes, p-values, confidence intervals, or effect estimates that are not present in the supplied results.",
+        "- If required information is missing, state this explicitly (e.g. 'The study setting was not specified').",
+        "- Do not add causal language unless explicitly appropriate for the stated study design.",
+        "- Do not include a discussion or interpretation of findings beyond factual reporting.",
+        "- Write in a neutral, precise style appropriate for submission to a peer-reviewed journal.",
+        "",
+        "---",
+        "",
+        "## SECTION 1: USER-PROVIDED STUDY INFORMATION",
+        "",
+        paste0("### Study Design: ", if (nchar(design) > 0) design else "[Not specified]"),
+        "",
+        paste0("### Study Setting: ", if (nchar(setting) > 0) setting else "[Not specified]"),
+        "",
+        paste0("### Participants: ", if (nchar(participants) > 0) participants else "[Not specified]"),
+        "",
+        paste0("### Timepoint Definitions: ", if (nchar(timepoints) > 0) timepoints else "[Not specified]"),
+        "",
+        paste0("### Outcome Definitions: ", if (nchar(outcome_defs) > 0) outcome_defs else "[Not specified]"),
+        "",
+        "---",
+        "",
+        "## SECTION 2: ANALYSIS MANIFEST (auto-captured from app)",
+        ""
+      )
+
+      # Data summary
+      if (!is.null(manifest$data)) {
+        prompt_lines <- c(prompt_lines,
+          "### Data Summary",
+          paste0("- Sample size: ", manifest$data$n_rows, " observations"),
+          paste0("- Variables: ", manifest$data$n_cols,
+                 " (", manifest$data$n_numeric, " numeric, ",
+                 manifest$data$n_categorical, " categorical)"),
+          paste0("- Missing values: ", manifest$data$n_missing,
+                 " (", manifest$data$pct_missing, "% of all cells)"),
+          paste0("- Variable classifications: ", manifest$data$var_types),
+          "")
+      }
+
+      # Table 1
+      if (!is.null(manifest$table1)) {
+        prompt_lines <- c(prompt_lines,
+          "### Table 1: Descriptive Statistics",
+          "```",
+          manifest$table1,
+          "```",
+          "")
+      }
+
+      # Model
+      if (!is.null(manifest$model)) {
+        prompt_lines <- c(prompt_lines,
+          "### Statistical Model",
+          paste0("- Type: ", manifest$model$type),
+          paste0("- Formula: ", manifest$model$formula),
+          "",
+          "### Model Coefficients",
+          "```",
+          manifest$model$coefficients,
+          "```",
+          "")
+
+        if (nchar(manifest$model$or_hr) > 0) {
+          label <- if (grepl("ogistic", manifest$model$type)) "Odds Ratios" else "Hazard Ratios"
+          prompt_lines <- c(prompt_lines,
+            paste0("### ", label, " (exponentiated)"),
+            "```",
+            manifest$model$or_hr,
+            "```",
+            "")
+        }
+      }
+
+      # Software
+      prompt_lines <- c(prompt_lines,
+        "### Software",
+        paste0("- ", manifest$software$r_version),
+        paste0("- Packages: ", manifest$software$packages),
+        paste0("- Platform: ", manifest$software$platform),
+        "",
+        "---",
+        "",
+        "## REQUESTED OUTPUT",
+        "",
+        "Please generate:",
+        "",
+        "1. A **Methods** section containing:",
+        "   - Study design and setting",
+        "   - Participants and eligibility criteria",
+        "   - Outcome definitions",
+        "   - Statistical analysis methods (matching exactly what was performed)",
+        "   - Software and reproducibility statement",
+        "",
+        "2. A **Results** section containing:",
+        "   - Participant flow and sample characteristics (referencing Table 1)",
+        "   - Primary and secondary outcome results",
+        "   - In-text references to tables and figures",
+        "   - Effect estimates with confidence intervals and p-values",
+        "",
+        "Write for a general medical/scientific journal audience."
+      )
+
+      prompt_text <- paste(prompt_lines, collapse = "\n")
+      session$sendCustomMessage("updateReportText",
+        list(id = ns("prompt_text"), text = prompt_text))
+      showNotification("LLM prompt generated. Copy and paste into your preferred LLM.",
+                       type = "message")
+    })
+
+    # Copy prompt to clipboard
+    observeEvent(input$copy_prompt, {
+      session$sendCustomMessage("copyTextareaToClipboard", ns("prompt_text"))
+    })
+
+    # --- HTML report for PDF export ---
     generate_html_report <- function() {
       # Build Table 1 HTML
       table1_html <- ""
@@ -1270,6 +1627,21 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler('updateReportText', function(msg) {
         var el = document.getElementById(msg.id);
         if (el) el.value = msg.text;
+      });
+
+      // Copy textarea content to clipboard
+      Shiny.addCustomMessageHandler('copyTextareaToClipboard', function(elementId) {
+        var el = document.getElementById(elementId);
+        if (!el || !el.value || el.value.indexOf('Complete the study') === 0) {
+          alert('Generate the prompt first, then copy.');
+          return;
+        }
+        navigator.clipboard.writeText(el.value).then(function() {
+          // Brief visual feedback
+        }).catch(function() {
+          el.select();
+          document.execCommand('copy');
+        });
       });
 
       // Loading progress updates
