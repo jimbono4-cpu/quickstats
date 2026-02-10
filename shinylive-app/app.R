@@ -1102,9 +1102,29 @@ results_server <- function(id, shared) {
         }
       }
 
-      # Table 1
+      # Table 1 — extract as formatted text for LLM consumption
       if (!is.null(shared$table1)) {
-        manifest$table1 <- paste(capture.output(print(shared$table1)), collapse = "\n")
+        t1_text <- tryCatch({
+          # Try to get a tibble/data.frame from gtsummary
+          t1_df <- gtsummary::as_tibble(shared$table1, col_labels = TRUE)
+          # Format as aligned text table
+          col_widths <- sapply(names(t1_df), function(cn) {
+            max(nchar(cn), max(nchar(as.character(t1_df[[cn]])), na.rm = TRUE), na.rm = TRUE)
+          })
+          header <- paste(mapply(function(nm, w) formatC(nm, width = w, flag = "-"),
+                                 names(t1_df), col_widths), collapse = " | ")
+          sep_line <- paste(sapply(col_widths, function(w) paste(rep("-", w), collapse = "")),
+                            collapse = "-+-")
+          rows <- apply(t1_df, 1, function(row) {
+            paste(mapply(function(val, w) formatC(as.character(val), width = w, flag = "-"),
+                         row, col_widths), collapse = " | ")
+          })
+          paste(c(header, sep_line, rows), collapse = "\n")
+        }, error = function(e) {
+          # Fallback: capture.output print
+          paste(capture.output(print(shared$table1)), collapse = "\n")
+        })
+        manifest$table1 <- t1_text
       }
 
       # Regression model
@@ -1144,11 +1164,28 @@ results_server <- function(id, shared) {
           )), collapse = "\n")
         }
 
+        # Model fit statistics
+        fit_stats <- ""
+        if (!is.null(res$fit)) {
+          tryCatch({
+            gl <- broom::glance(res$fit)
+            stat_parts <- c()
+            if ("r.squared" %in% names(gl)) stat_parts <- c(stat_parts, paste0("R-squared = ", round(gl$r.squared, 4)))
+            if ("adj.r.squared" %in% names(gl)) stat_parts <- c(stat_parts, paste0("Adj. R-squared = ", round(gl$adj.r.squared, 4)))
+            if ("AIC" %in% names(gl)) stat_parts <- c(stat_parts, paste0("AIC = ", round(gl$AIC, 1)))
+            if ("BIC" %in% names(gl)) stat_parts <- c(stat_parts, paste0("BIC = ", round(gl$BIC, 1)))
+            if ("nobs" %in% names(gl)) stat_parts <- c(stat_parts, paste0("N = ", gl$nobs))
+            if ("concordance" %in% names(gl)) stat_parts <- c(stat_parts, paste0("Concordance = ", round(gl$concordance, 3)))
+            fit_stats <- paste(stat_parts, collapse = "; ")
+          }, error = function(e) NULL)
+        }
+
         manifest$model <- list(
           type = model_label,
           formula = if (!is.null(res$fit)) deparse(formula(res$fit)) else "Not captured",
           coefficients = coef_table,
-          or_hr = or_hr_text
+          or_hr = or_hr_text,
+          fit_stats = fit_stats
         )
       }
 
@@ -1303,6 +1340,13 @@ results_server <- function(id, shared) {
             "```",
             "")
         }
+
+        if (nchar(manifest$model$fit_stats) > 0) {
+          prompt_lines <- c(prompt_lines,
+            "### Model Fit Statistics",
+            paste0("- ", manifest$model$fit_stats),
+            "")
+        }
       }
 
       # Software
@@ -1316,22 +1360,49 @@ results_server <- function(id, shared) {
         "",
         "## REQUESTED OUTPUT",
         "",
-        "Please generate:",
+        "Please generate the following sections. ALL tables must be **journal-ready**:",
+        "formatted for direct inclusion in a peer-reviewed manuscript, with proper",
+        "headers, footnotes, units, and formatting conventions (e.g. mean (SD),",
+        "n (%), OR [95% CI]).",
         "",
-        "1. A **Methods** section containing:",
+        "### 1. Methods Section",
         "   - Study design and setting",
         "   - Participants and eligibility criteria",
         "   - Outcome definitions",
         "   - Statistical analysis methods (matching exactly what was performed)",
         "   - Software and reproducibility statement",
         "",
-        "2. A **Results** section containing:",
-        "   - Participant flow and sample characteristics (referencing Table 1)",
+        "### 2. Results Section",
+        "   - Participant flow and sample characteristics",
         "   - Primary and secondary outcome results",
-        "   - In-text references to tables and figures",
-        "   - Effect estimates with confidence intervals and p-values",
+        "   - In-text references to tables and figures (e.g. 'Table 1', 'Table 2')",
+        "   - Effect estimates with confidence intervals and p-values reported in-text",
         "",
-        "Write for a general medical/scientific journal audience."
+        "### 3. Table 1 — Baseline Characteristics",
+        "Generate a **journal-ready Table 1** from the descriptive statistics above.",
+        "   - Title: 'Table 1. Baseline characteristics of study participants'",
+        "   - Format continuous variables as: mean (SD) or median [IQR] as appropriate",
+        "   - Format categorical variables as: n (%)",
+        "   - Include column headers for each group (if stratified) and overall",
+        "   - Add a footnote row listing statistical tests used (e.g. t-test, chi-squared, Fisher's exact)",
+        "   - Use the exact variable names and values from the supplied data — do NOT invent additional variables",
+        "",
+        "### 4. Table 2 — Regression Results",
+        "Generate a **journal-ready Table 2** from the model coefficients above.",
+        "   - Title: 'Table 2. Association between [exposure] and [outcome]'",
+        "     (fill in exposure/outcome from the model formula)",
+        "   - For linear regression: report beta coefficients (95% CI), p-values",
+        "   - For logistic regression: report odds ratios (95% CI), p-values",
+        "   - For Cox regression: report hazard ratios (95% CI), p-values",
+        "   - For mixed models: report fixed-effect estimates (95% CI), p-values, and random-effect variance components",
+        "   - Include intercept/reference categories as appropriate",
+        "   - Add a footnote row with: model type, sample size, R-squared or C-statistic (if available),",
+        "     and any notes about robust standard errors or clustering",
+        "   - Use the exact terms and values from the supplied coefficients — do NOT invent additional results",
+        "",
+        "Write for a general medical/scientific journal audience (e.g. BMJ, JAMA style).",
+        "Tables should be formatted in plain text with clear column alignment,",
+        "ready to be pasted into a manuscript or converted to a formatted table."
       )
 
       prompt_text <- paste(prompt_lines, collapse = "\n")
