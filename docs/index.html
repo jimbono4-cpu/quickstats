@@ -914,226 +914,9 @@ model_server <- function(id, shared) {
 }
 
 
-# =============================================================================
-# MODULE: Step 5 — Causal Inference Guidance
-# =============================================================================
-
-causal_ui <- function(id) {
-  ns <- NS(id)
-  tagList(
-    fluidRow(
-      column(4,
-        div(class = "well",
-          h4("Causal Structure"),
-          p(class = "text-muted small",
-            "Define the causal relationships between your variables.",
-            "This generates a DAG and recommends adjustment sets."),
-          selectInput(ns("exposure"), "Exposure (treatment):", choices = NULL),
-          selectInput(ns("outcome_var"), "Outcome:", choices = NULL),
-          hr(),
-          h5("Covariates"),
-          uiOutput(ns("covariate_roles")),
-          hr(),
-          actionButton(ns("build_dag"), "Build DAG", class = "btn-primary"),
-          br(), br(),
-          actionButton(ns("suggest_adjust"), "Suggest Adjustment Set",
-                       class = "btn-outline-info btn-sm")
-        )
-      ),
-      column(8,
-        tabsetPanel(
-          tabPanel("DAG",
-            plotOutput(ns("dag_plot"), height = "500px")
-          ),
-          tabPanel("Adjustment Set",
-            uiOutput(ns("adjustment_info"))
-          ),
-          tabPanel("Guidance",
-            uiOutput(ns("causal_guidance"))
-          )
-        )
-      )
-    )
-  )
-}
-
-causal_server <- function(id, shared) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-
-    observe({
-      req(shared$data)
-      vars <- names(shared$data)
-      updateSelectInput(session, "exposure", choices = vars)
-      updateSelectInput(session, "outcome_var", choices = vars)
-    })
-
-    output$covariate_roles <- renderUI({
-      req(shared$data, input$exposure, input$outcome_var)
-      other_vars <- setdiff(names(shared$data), c(input$exposure, input$outcome_var))
-      if (length(other_vars) == 0) return(p("No other variables"))
-      other_vars <- head(other_vars, 10)
-
-      lapply(other_vars, function(v) {
-        selectInput(ns(paste0("role_", v)), label = v,
-                    choices = c("Not included" = "none",
-                                "Confounder" = "confounder",
-                                "Mediator" = "mediator",
-                                "Collider" = "collider",
-                                "Instrument" = "instrument",
-                                "Ancestor of exposure" = "ancestor_exp",
-                                "Ancestor of outcome" = "ancestor_out"),
-                    selected = "none")
-      })
-    })
-
-    dag_obj <- reactiveVal(NULL)
-
-    observeEvent(input$build_dag, {
-      req(input$exposure, input$outcome_var, shared$data)
-      if (!requireNamespace("ggdag", quietly = TRUE)) {
-        showNotification("ggdag package not available", type = "error")
-        return()
-      }
-
-      other_vars <- setdiff(names(shared$data), c(input$exposure, input$outcome_var))
-      other_vars <- head(other_vars, 10)
-
-      formulas <- list()
-      formulas[[1]] <- as.formula(paste(input$outcome_var, "~", input$exposure))
-
-      for (v in other_vars) {
-        role <- input[[paste0("role_", v)]]
-        if (is.null(role) || role == "none") next
-
-        if (role == "confounder") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$outcome_var, "~", v))
-        } else if (role == "mediator") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$exposure))
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$outcome_var, "~", v))
-        } else if (role == "collider") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$exposure))
-          formulas[[length(formulas) + 1]] <- as.formula(paste(v, "~", input$outcome_var))
-        } else if (role == "instrument") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
-        } else if (role == "ancestor_exp") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$exposure, "~", v))
-        } else if (role == "ancestor_out") {
-          formulas[[length(formulas) + 1]] <- as.formula(paste(input$outcome_var, "~", v))
-        }
-      }
-
-      tryCatch({
-        dag <- do.call(ggdag::dagify, c(formulas, list(
-          exposure = input$exposure,
-          outcome = input$outcome_var
-        )))
-        dag_obj(dag)
-        shared$dag <- dag
-        showNotification("DAG built successfully", type = "message")
-      }, error = function(e) {
-        showNotification(paste("DAG error:", conditionMessage(e)), type = "error")
-      })
-    })
-
-    output$dag_plot <- renderPlot({
-      dag <- dag_obj()
-      if (is.null(dag)) {
-        plot.new()
-        text(0.5, 0.5, "Define variables and click 'Build DAG'",
-             cex = 1.5, col = "grey50")
-        return()
-      }
-      tryCatch({
-        ggdag::ggdag_status(dag) +
-          ggdag::theme_dag() +
-          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
-      }, error = function(e) {
-        ggdag::ggdag(dag) +
-          ggdag::theme_dag() +
-          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
-      })
-    })
-
-    # Compute adjustment sets via dagitty backend
-    output$adjustment_info <- renderUI({
-      dag <- dag_obj()
-      if (is.null(dag)) {
-        return(p(class = "text-muted", "Build a DAG first"))
-      }
-
-      tryCatch({
-        # Use dagitty::adjustmentSets on the underlying dagitty object
-        dagitty_obj <- dag$dag
-        adj <- dagitty::adjustmentSets(dagitty_obj)
-
-        if (length(adj) == 0) {
-          return(tagList(
-            h5("Minimal Sufficient Adjustment Set"),
-            p("No adjustment needed -- the causal effect is already identified",
-              "without conditioning on any covariates."),
-            p(class = "text-muted small",
-              "This may occur when there are no backdoor paths between",
-              "the exposure and outcome.")
-          ))
-        }
-
-        adj_vars <- lapply(adj, function(s) paste(s, collapse = ", "))
-        tagList(
-          h5("Minimal Sufficient Adjustment Set(s)"),
-          p("To estimate the causal effect of",
-            strong(input$exposure), "on", strong(input$outcome_var),
-            ", adjust for:"),
-          tags$ul(
-            lapply(adj_vars, function(s) tags$li(strong(s)))
-          ),
-          hr(),
-          p(class = "text-muted small",
-            "These are the minimal sets of variables to condition on",
-            "to block all backdoor paths. Any one set is sufficient.")
-        )
-      }, error = function(e) {
-        p("Could not compute adjustment sets:", conditionMessage(e))
-      })
-    })
-
-    output$causal_guidance <- renderUI({
-      tagList(
-        h5("Causal Inference Quick Guide"),
-        tags$dl(
-          tags$dt("Confounder"),
-          tags$dd("A variable that causes both the exposure and outcome.",
-                  "You SHOULD adjust for confounders to remove bias."),
-          tags$dt("Mediator"),
-          tags$dd("A variable on the causal pathway (exposure -> mediator -> outcome).",
-                  "Do NOT adjust if you want the total effect.",
-                  "Adjust only if you want the direct effect."),
-          tags$dt("Collider"),
-          tags$dd("A variable caused by both the exposure and outcome.",
-                  "Do NOT adjust for colliders -- conditioning on a collider",
-                  "introduces spurious association (collider bias)."),
-          tags$dt("Instrument"),
-          tags$dd("A variable that affects the exposure but has no direct effect",
-                  "on the outcome except through the exposure.",
-                  "Useful for instrumental variable analysis.")
-        ),
-        hr(),
-        h5("Common Mistakes"),
-        tags$ul(
-          tags$li("Adjusting for a ", strong("mediator"), " when you want the total effect"),
-          tags$li("Adjusting for a ", strong("collider"), " (opens a biasing pathway)"),
-          tags$li("Failing to adjust for a ", strong("confounder"), " (leaves backdoor path open)"),
-          tags$li("Including ", strong("descendants of the outcome"), " as predictors")
-        )
-      )
-    })
-  })
-}
-
 
 # =============================================================================
-# MODULE: Step 6 — Results & Export
+# MODULE: Step 5 — Results & Export
 # =============================================================================
 
 results_ui <- function(id) {
@@ -1155,13 +938,11 @@ results_ui <- function(id) {
               tabPanel("Regression",
                 uiOutput(ns("show_regression"))
               ),
-              tabPanel("DAG",
-                plotOutput(ns("show_dag"), height = "450px")
-              ),
               tabPanel("Export",
-                h5("Download Results"),
-                p("Click below to download a markdown report with all results."),
-                actionButton(ns("download_report"), "Download Report (.md)",
+                h5("Download Report as PDF"),
+                p("Generate a print-ready report containing all your results.",
+                  "Your browser's print dialog will open — select 'Save as PDF'."),
+                actionButton(ns("download_pdf"), "Download Report (PDF)",
                              class = "btn-primary"),
                 actionButton(ns("preview_report"), "Preview Report",
                              class = "btn-outline-secondary"),
@@ -1223,91 +1004,162 @@ results_server <- function(id, shared) {
       })
     })
 
-    output$show_dag <- renderPlot({
-      dag <- shared$dag
-      if (is.null(dag)) {
-        plot.new()
-        text(0.5, 0.5, "No DAG built yet. Go to Step 5.", cex = 1.5, col = "grey50")
-        return()
+    # Generate an HTML report string (for PDF via browser print)
+    generate_html_report <- function() {
+      # Build Table 1 HTML
+      table1_html <- ""
+      if (!is.null(shared$table1)) {
+        tryCatch({
+          if (requireNamespace("gt", quietly = TRUE)) {
+            gt_tbl <- gtsummary::as_gt(shared$table1)
+            table1_html <- gt::as_raw_html(gt_tbl)
+          } else {
+            table1_html <- paste0("<pre>",
+              paste(capture.output(print(shared$table1)), collapse = "\n"),
+              "</pre>")
+          }
+        }, error = function(e) {
+          table1_html <<- paste0("<pre>",
+            paste(capture.output(print(shared$table1)), collapse = "\n"),
+            "</pre>")
+        })
       }
-      tryCatch({
-        ggdag::ggdag_status(dag) +
-          ggdag::theme_dag() +
-          ggplot2::labs(title = "Directed Acyclic Graph (DAG)")
-      }, error = function(e) {
-        ggdag::ggdag(dag) + ggdag::theme_dag()
-      })
-    })
 
-    generate_report <- function() {
+      # Build regression results HTML
+      regression_html <- ""
+      if (!is.null(shared$model_result)) {
+        display_df <- shared$model_result$tidy
+        display_df$estimate <- round(display_df$estimate, 4)
+        display_df$std.error <- round(display_df$std.error, 4)
+        display_df$statistic <- round(display_df$statistic, 3)
+        display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
+                                     round(display_df$p.value, 4))
+        tryCatch({
+          if (requireNamespace("gt", quietly = TRUE)) {
+            model_label <- switch(shared$model_result$type,
+              "lm" = "Linear Regression",
+              "glm" = "Logistic Regression",
+              "cox" = "Cox Proportional Hazards",
+              "lmer" = "Mixed Model",
+              shared$model_result$type)
+            gt_tbl <- gt::gt(display_df) |>
+              gt::tab_header(title = paste("Regression Results -", model_label))
+            regression_html <- gt::as_raw_html(gt_tbl)
+          } else {
+            regression_html <- paste0("<pre>",
+              paste(capture.output(print(display_df)), collapse = "\n"),
+              "</pre>")
+          }
+        }, error = function(e) {
+          regression_html <<- paste0("<pre>",
+            paste(capture.output(print(display_df)), collapse = "\n"),
+            "</pre>")
+        })
+      }
+
+      # Data summary section
+      data_html <- ""
+      if (!is.null(shared$data)) {
+        df <- shared$data
+        data_html <- paste0(
+          "<ul>",
+          "<li><strong>Rows:</strong> ", nrow(df), "</li>",
+          "<li><strong>Columns:</strong> ", ncol(df), "</li>",
+          "<li><strong>Numeric variables:</strong> ", sum(sapply(df, is.numeric)), "</li>",
+          "<li><strong>Missing values:</strong> ", sum(is.na(df)), "</li>",
+          "</ul>")
+      }
+
+      # Assemble full HTML page
+      html <- paste0(
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+        '<title>Statistical Analysis Report</title>',
+        '<style>',
+        '  body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;',
+        '         max-width: 900px; margin: 0 auto; padding: 30px; color: #333; }',
+        '  h1 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; }',
+        '  h2 { color: #444; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }',
+        '  table { border-collapse: collapse; width: 100%; margin: 15px 0; }',
+        '  th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }',
+        '  th { background-color: #f8f9fa; font-weight: bold; }',
+        '  tr:nth-child(even) { background-color: #f9f9f9; }',
+        '  .meta { color: #666; font-size: 0.9em; }',
+        '  .privacy { background: #d4edda; border: 1px solid #c3e6cb; ',
+        '             padding: 8px 15px; border-radius: 4px; margin: 15px 0; ',
+        '             color: #155724; font-size: 0.9em; }',
+        '  @media print { body { padding: 0; } }',
+        '</style></head><body>',
+        '<h1>Statistical Analysis Report</h1>',
+        '<p class="meta"><strong>Generated:</strong> ', format(Sys.time(), "%Y-%m-%d %H:%M"), '</p>',
+        '<p class="meta"><strong>Data:</strong> ',
+          if (!is.null(shared$data_name)) shared$data_name else "Unknown", '</p>',
+        '<p class="meta"><strong>R Version:</strong> ', R.version.string, '</p>',
+        '<div class="privacy">All analysis performed in-browser via WebR. ',
+        'No data was uploaded to any server.</div>')
+
+      if (nchar(data_html) > 0) {
+        html <- paste0(html, '<h2>Data Summary</h2>', data_html)
+      }
+
+      if (nchar(table1_html) > 0) {
+        html <- paste0(html, '<h2>Table 1: Descriptive Statistics</h2>', table1_html)
+      }
+
+      if (nchar(regression_html) > 0) {
+        html <- paste0(html, '<h2>Regression Results</h2>', regression_html)
+      }
+
+      html <- paste0(html, '</body></html>')
+      html
+    }
+
+    # Preview: plain text summary in the textarea
+    observeEvent(input$preview_report, {
       lines <- c(
-        "# Statistical Analysis Report",
-        "",
-        paste0("**Generated:** ", Sys.time()),
-        paste0("**Data:** ", if (!is.null(shared$data_name)) shared$data_name else "Unknown"),
-        paste0("**R Version:** ", R.version.string),
-        "",
-        "---",
-        "",
-        "*All analysis performed in-browser via WebR. No data was uploaded to any server.*",
+        "STATISTICAL ANALYSIS REPORT",
+        paste0("Generated: ", Sys.time()),
+        paste0("Data: ", if (!is.null(shared$data_name)) shared$data_name else "Unknown"),
         ""
       )
 
       if (!is.null(shared$data)) {
         df <- shared$data
         lines <- c(lines,
-          "## Data Summary", "",
-          paste0("- **Rows:** ", nrow(df)),
-          paste0("- **Columns:** ", ncol(df)),
-          paste0("- **Numeric variables:** ", sum(sapply(df, is.numeric))),
-          paste0("- **Missing values:** ", sum(is.na(df))),
-          ""
-        )
+          "DATA SUMMARY",
+          paste0("  Rows: ", nrow(df)),
+          paste0("  Columns: ", ncol(df)),
+          paste0("  Missing values: ", sum(is.na(df))),
+          "")
       }
 
       if (!is.null(shared$table1)) {
-        lines <- c(lines,
-          "## Table 1: Descriptive Statistics", "",
-          paste(capture.output(print(shared$table1)), collapse = "\n"),
-          ""
-        )
+        lines <- c(lines, "TABLE 1", "",
+          paste(capture.output(print(shared$table1)), collapse = "\n"), "")
       }
 
       if (!is.null(shared$model_result)) {
-        lines <- c(lines,
-          "## Regression Results", "",
-          paste0("**Model type:** ", shared$model_result$type), "",
-          "| Term | Estimate | Std.Error | Statistic | P-value |",
-          "|------|----------|-----------|-----------|---------|"
-        )
         tidy_df <- shared$model_result$tidy
-        for (i in seq_len(nrow(tidy_df))) {
-          row <- tidy_df[i, ]
-          pval <- if (row$p.value < 0.001) "<0.001" else as.character(round(row$p.value, 4))
-          lines <- c(lines, sprintf("| %s | %.4f | %.4f | %.3f | %s |",
-            row$term, row$estimate, row$std.error, row$statistic, pval))
-        }
-        lines <- c(lines, "")
+        lines <- c(lines, paste("REGRESSION RESULTS -", shared$model_result$type), "",
+          paste(capture.output(print(
+            data.frame(
+              Term = tidy_df$term,
+              Estimate = round(tidy_df$estimate, 4),
+              SE = round(tidy_df$std.error, 4),
+              Statistic = round(tidy_df$statistic, 3),
+              P = ifelse(tidy_df$p.value < 0.001, "<0.001", round(tidy_df$p.value, 4)),
+              stringsAsFactors = FALSE
+            ), row.names = FALSE
+          )), collapse = "\n"), "")
       }
 
-      paste(lines, collapse = "\n")
-    }
-
-    # Preview report in textarea
-    observeEvent(input$preview_report, {
-      md <- generate_report()
       session$sendCustomMessage("updateReportText",
-        list(id = ns("report_text"), text = md))
+        list(id = ns("report_text"), text = paste(lines, collapse = "\n")))
     })
 
-    # Download report
-    observeEvent(input$download_report, {
-      md <- generate_report()
-      session$sendCustomMessage("downloadMarkdown",
-        list(content = md, filename = paste0("analysis_report_", Sys.Date(), ".md")))
-      # Also update the preview
-      session$sendCustomMessage("updateReportText",
-        list(id = ns("report_text"), text = md))
+    # Download as PDF via browser print dialog
+    observeEvent(input$download_pdf, {
+      html_report <- generate_html_report()
+      session$sendCustomMessage("downloadPDF", list(content = html_report))
     })
   })
 }
@@ -1401,17 +1253,17 @@ ui <- fluidPage(
         }
       });
 
-      // Download markdown file
-      Shiny.addCustomMessageHandler('downloadMarkdown', function(msg) {
-        var blob = new Blob([msg.content], {type: 'text/markdown'});
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = msg.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      // Download report as PDF via browser print dialog
+      Shiny.addCustomMessageHandler('downloadPDF', function(msg) {
+        var win = window.open('', '_blank');
+        if (!win) {
+          alert('Pop-up blocked. Please allow pop-ups for this site to download the PDF report.');
+          return;
+        }
+        win.document.write(msg.content);
+        win.document.close();
+        // Wait for content to render, then trigger print
+        setTimeout(function() { win.print(); }, 500);
       });
 
       // Update report textarea
@@ -1503,15 +1355,7 @@ ui <- fluidPage(
 
     tabPanelBody("step5",
       div(class = "step-header",
-        h3("Step 5: Causal Inference"),
-        p("Define causal structure, build a DAG, and identify adjustment sets.")
-      ),
-      causal_ui("causal")
-    ),
-
-    tabPanelBody("step6",
-      div(class = "step-header",
-        h3("Step 6: Results & Export"),
+        h3("Step 5: Results & Export"),
         p("Review all results and download your analysis report.")
       ),
       results_ui("results")
@@ -1540,7 +1384,6 @@ server <- function(input, output, session) {
     var_types = NULL,
     table1 = NULL,
     model_result = NULL,
-    dag = NULL,
     last_export = NULL
   )
 
@@ -1549,7 +1392,7 @@ server <- function(input, output, session) {
   observe({
     pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
-              "haven", "readxl", "writexl", "lme4", "ggdag")
+              "haven", "readxl", "writexl", "lme4")
     total <- length(pkgs)
 
     for (i in seq_along(pkgs)) {
@@ -1570,8 +1413,8 @@ server <- function(input, output, session) {
 
   # Current step tracker
   current_step <- reactiveVal(1)
-  total_steps <- 6
-  step_names <- c("Upload", "Explore", "Table 1", "Model", "Causal", "Results")
+  total_steps <- 5
+  step_names <- c("Upload", "Explore", "Table 1", "Model", "Results")
   step_ids <- paste0("step", 1:total_steps)
 
   # Step indicator
@@ -1626,7 +1469,6 @@ server <- function(input, output, session) {
   explore_server("explore", shared)
   table1_server("table1", shared)
   model_server("model", shared)
-  causal_server("causal", shared)
   results_server("results", shared)
 }
 
