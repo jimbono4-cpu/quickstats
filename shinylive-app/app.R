@@ -1155,25 +1155,46 @@ model_server <- function(id, shared) {
           }
         }
       } else {
+        # lm or lmer: exposure vs outcome plots
         sel <- input$plot_vars
         outcome <- input$outcome
         if (!is.null(sel) && length(sel) > 0 && !is.null(outcome)) {
           vt <- shared$var_types
-          plot_descriptions <- lapply(sel, function(v) {
+
+          # For multiple variables: create ONE faceted plot description
+          if (length(sel) > 1) {
+            var_types_desc <- sapply(sel, function(v) {
+              is_cat <- (!is.null(vt) && v %in% vt$variable &&
+                         vt$type[vt$variable == v] == "categorical")
+              if (is_cat) "categorical" else "continuous"
+            })
+            plot_descriptions <- list(list(
+              type = "faceted_plot",
+              title = paste("Outcome by Exposures:", paste(sel, collapse = ", ")),
+              description = paste0("Faceted plot showing ", outcome, " by ",
+                length(sel), " predictor variables: ", paste(sel, collapse = ", "),
+                ". Scatter plots with regression lines for continuous variables; ",
+                "box plots for categorical variables.")
+            ))
+          } else {
+            # Single variable: one plot
+            v <- sel[1]
             is_cat <- (!is.null(vt) && v %in% vt$variable &&
                        vt$type[vt$variable == v] == "categorical")
             if (is_cat) {
-              list(type = "box_plot",
-                   title = paste(outcome, "by", v),
-                   description = paste0("Box plot of ", outcome, " by levels of ", v,
-                     " (categorical). Red diamond = group mean."))
+              plot_descriptions <- list(list(
+                type = "box_plot",
+                title = paste(outcome, "by", v),
+                description = paste0("Box plot of ", outcome, " by levels of ", v,
+                  " (categorical). Red diamond = group mean.")))
             } else {
-              list(type = "scatter_plot",
-                   title = paste(outcome, "vs", v),
-                   description = paste0("Scatter plot of ", outcome, " vs ", v,
-                     " (continuous) with linear regression line and 95% CI band."))
+              plot_descriptions <- list(list(
+                type = "scatter_plot",
+                title = paste(outcome, "vs", v),
+                description = paste0("Scatter plot of ", outcome, " vs ", v,
+                  " (continuous) with linear regression line and 95% CI band.")))
             }
-          })
+          }
         }
       }
 
@@ -1443,27 +1464,25 @@ results_server <- function(id, shared) {
       items <- list()
       fig_num <- 0
 
-      # Custom plots from Plots tab
+      # Custom plots from Plots tab (ONE image, possibly with multiple descriptions)
       if (!is.null(b64) && nchar(b64) > 0) {
+        fig_num <- fig_num + 1
+        plot_title <- "Model Plots"
+        plot_desc_text <- ""
+
         if (!is.null(plots_desc) && length(plots_desc) > 0) {
-          for (i in seq_along(plots_desc)) {
-            fig_num <- fig_num + 1
-            pd <- plots_desc[[i]]
-            items <- c(items, list(
-              h5(paste0("Figure ", fig_num, ": ", pd$title)),
-              tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
-              p(style = "color:#666; font-size:0.9em;", pd$description),
-              hr()
-            ))
-          }
-        } else {
-          fig_num <- fig_num + 1
-          items <- c(items, list(
-            h5(paste0("Figure ", fig_num, ": Model Plots")),
-            tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
-            hr()
-          ))
+          # Use first plot description's title (should be only one for faceted plots)
+          plot_title <- plots_desc[[1]]$title
+          # Combine all descriptions
+          plot_desc_text <- paste(sapply(plots_desc, function(pd) pd$description), collapse = " ")
         }
+
+        items <- c(items, list(
+          h5(paste0("Figure ", fig_num, ": ", plot_title)),
+          tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
+          if (nchar(plot_desc_text) > 0) p(style = "color:#666; font-size:0.9em;", plot_desc_text),
+          hr()
+        ))
       }
 
       # Diagnostics forest plot
