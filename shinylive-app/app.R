@@ -877,7 +877,8 @@ model_server <- function(id, shared) {
       HTML(diag_html)
     })
 
-    output$forest_plot <- renderPlot({
+    # Diagnostics forest plot as a reactive (so we can reuse it for export)
+    diagnostics_forest_plot <- reactive({
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
@@ -905,8 +906,79 @@ model_server <- function(id, shared) {
         ggplot2::geom_point(size = 3, color = "#4e79a7") +
         ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
         ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
-        ggplot2::labs(title = "Forest Plot", x = x_label, y = "") +
+        ggplot2::labs(title = "Forest Plot — All Predictors", x = x_label, y = "") +
         ggplot2::theme_minimal(base_size = 14)
+    })
+
+    output$forest_plot <- renderPlot({
+      diagnostics_forest_plot()
+    })
+
+    # Store diagnostics forest plot info for reports
+    observe({
+      mod <- model_fit()
+      tidy_df <- model_tidy()
+      if (is.null(mod) || is.null(tidy_df)) {
+        shared$diagnostics_plot <- NULL
+        shared$diagnostics_plot_base64 <- NULL
+        return()
+      }
+
+      plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
+      if (nrow(plot_df) == 0) {
+        shared$diagnostics_plot <- NULL
+        shared$diagnostics_plot_base64 <- NULL
+        return()
+      }
+
+      # Build description
+      mtype <- input$model_type
+      if (mtype %in% c("glm", "cox")) {
+        label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
+        desc_items <- sapply(seq_len(nrow(plot_df)), function(i) {
+          r <- plot_df[i, ]
+          paste0(r$term, ": ", round(r$OR_HR, 2),
+                 " [", round(r$ci_lower, 2), "-", round(r$ci_upper, 2), "]",
+                 ", p=", if (r$p.value < 0.001) "<0.001" else round(r$p.value, 3))
+        })
+        shared$diagnostics_plot <- list(
+          type = "forest_plot_diagnostics",
+          title = paste("Forest Plot:", label, "(All Predictors)"),
+          description = paste0("Forest plot showing ", label,
+            " with 95% CIs for all model predictors."),
+          details = paste(desc_items, collapse = "; ")
+        )
+      } else {
+        # Linear/mixed: coefficient plot
+        desc_items <- sapply(seq_len(nrow(plot_df)), function(i) {
+          r <- plot_df[i, ]
+          paste0(r$term, ": ", round(r$estimate, 3),
+                 " [", round(r$conf.low, 3), "-", round(r$conf.high, 3), "]",
+                 ", p=", if (r$p.value < 0.001) "<0.001" else round(r$p.value, 3))
+        })
+        shared$diagnostics_plot <- list(
+          type = "coefficient_plot",
+          title = "Coefficient Plot (All Predictors)",
+          description = "Coefficient plot showing regression coefficients with 95% CIs for all model predictors.",
+          details = paste(desc_items, collapse = "; ")
+        )
+      }
+
+      # Generate base64 image
+      tryCatch({
+        p <- diagnostics_forest_plot()
+        if (!is.null(p)) {
+          tmp <- tempfile(fileext = ".png")
+          grDevices::png(tmp, width = 800, height = 500, res = 120)
+          print(p)
+          grDevices::dev.off()
+          raw <- readBin(tmp, "raw", file.info(tmp)$size)
+          unlink(tmp)
+          shared$diagnostics_plot_base64 <- paste0("data:image/png;base64,", base64enc::base64encode(raw))
+        }
+      }, error = function(e) {
+        shared$diagnostics_plot_base64 <- NULL
+      })
     })
 
     # --- Plots tab: model-appropriate visualizations ---
@@ -1358,20 +1430,58 @@ results_server <- function(id, shared) {
     output$show_plots <- renderUI({
       b64 <- shared$plot_base64
       plots_desc <- shared$plots
-      if (is.null(b64) || nchar(b64) == 0) {
-        return(p(class = "text-muted", "No plots generated yet. Go to Step 4 > Plots tab."))
+      diag_b64 <- shared$diagnostics_plot_base64
+      diag_desc <- shared$diagnostics_plot
+
+      has_plots <- (!is.null(b64) && nchar(b64) > 0) ||
+                   (!is.null(diag_b64) && nchar(diag_b64) > 0)
+
+      if (!has_plots) {
+        return(p(class = "text-muted", "No plots generated yet. Go to Step 4 > Plots tab or Diagnostics tab."))
       }
-      desc_tags <- list()
-      if (!is.null(plots_desc) && length(plots_desc) > 0) {
-        desc_tags <- lapply(seq_along(plots_desc), function(i) {
-          pd <- plots_desc[[i]]
-          p(strong(paste0("Figure ", i, ": ")), pd$description)
-        })
+
+      items <- list()
+      fig_num <- 0
+
+      # Custom plots from Plots tab
+      if (!is.null(b64) && nchar(b64) > 0) {
+        if (!is.null(plots_desc) && length(plots_desc) > 0) {
+          for (i in seq_along(plots_desc)) {
+            fig_num <- fig_num + 1
+            pd <- plots_desc[[i]]
+            items <- c(items, list(
+              h5(paste0("Figure ", fig_num, ": ", pd$title)),
+              tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
+              p(style = "color:#666; font-size:0.9em;", pd$description),
+              hr()
+            ))
+          }
+        } else {
+          fig_num <- fig_num + 1
+          items <- c(items, list(
+            h5(paste0("Figure ", fig_num, ": Model Plots")),
+            tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
+            hr()
+          ))
+        }
       }
-      tagList(
-        tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd;"),
-        desc_tags
-      )
+
+      # Diagnostics forest plot
+      if (!is.null(diag_b64) && nchar(diag_b64) > 0) {
+        fig_num <- fig_num + 1
+        diag_title <- "Forest Plot (All Predictors)"
+        if (!is.null(diag_desc)) {
+          diag_title <- diag_desc$title
+        }
+        items <- c(items, list(
+          h5(paste0("Figure ", fig_num, ": ", diag_title)),
+          tags$img(src = diag_b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
+          p(style = "color:#666; font-size:0.9em;",
+            if (!is.null(diag_desc)) diag_desc$description else "")
+        ))
+      }
+
+      tagList(items)
     })
 
     output$show_regression <- renderUI({
@@ -1510,9 +1620,14 @@ results_server <- function(id, shared) {
         )
       }
 
-      # Plots
+      # Plots (from Plots tab)
       if (!is.null(shared$plots) && length(shared$plots) > 0) {
         manifest$plots <- shared$plots
+      }
+
+      # Diagnostics plot (forest plot from Diagnostics tab)
+      if (!is.null(shared$diagnostics_plot)) {
+        manifest$diagnostics_plot <- shared$diagnostics_plot
       }
 
       # Software
@@ -1565,6 +1680,12 @@ results_server <- function(id, shared) {
         items <- c(items, list(
           p(strong("Plots:"), length(manifest$plots), "figure(s) generated —",
             paste(unique(plot_types), collapse = ", "))
+        ))
+      }
+
+      if (!is.null(manifest$diagnostics_plot)) {
+        items <- c(items, list(
+          p(strong("Diagnostics plot:"), manifest$diagnostics_plot$title)
         ))
       }
 
@@ -1685,15 +1806,16 @@ results_server <- function(id, shared) {
       }
 
       # Plots / Figures
+      fig_num <- 0
       if (!is.null(manifest$plots) && length(manifest$plots) > 0) {
-        prompt_lines <- c(prompt_lines,
-          "### Figures Generated",
-          paste0("The following ", length(manifest$plots), " figure(s) were generated by the app:"),
-          "")
+        if (fig_num == 0) {
+          prompt_lines <- c(prompt_lines, "### Figures Generated", "")
+        }
         for (i in seq_along(manifest$plots)) {
+          fig_num <- fig_num + 1
           pd <- manifest$plots[[i]]
           prompt_lines <- c(prompt_lines,
-            paste0("**Figure ", i, ": ", pd$title, "**"),
+            paste0("**Figure ", fig_num, ": ", pd$title, "**"),
             paste0("- Type: ", pd$type),
             paste0("- Description: ", pd$description))
           if (!is.null(pd$details) && nchar(pd$details) > 0) {
@@ -1702,6 +1824,24 @@ results_server <- function(id, shared) {
           }
           prompt_lines <- c(prompt_lines, "")
         }
+      }
+
+      # Diagnostics plot (forest plot)
+      if (!is.null(manifest$diagnostics_plot)) {
+        if (fig_num == 0) {
+          prompt_lines <- c(prompt_lines, "### Figures Generated", "")
+        }
+        fig_num <- fig_num + 1
+        pd <- manifest$diagnostics_plot
+        prompt_lines <- c(prompt_lines,
+          paste0("**Figure ", fig_num, ": ", pd$title, "**"),
+          paste0("- Type: ", pd$type),
+          paste0("- Description: ", pd$description))
+        if (!is.null(pd$details) && nchar(pd$details) > 0) {
+          prompt_lines <- c(prompt_lines,
+            paste0("- Key values: ", pd$details))
+        }
+        prompt_lines <- c(prompt_lines, "")
       }
 
       # Software
@@ -1888,14 +2028,23 @@ results_server <- function(id, shared) {
       }
 
       # Plots section
+      fig_num <- 0
+      has_figures <- (!is.null(shared$plot_base64) && nchar(shared$plot_base64) > 0) ||
+                     (!is.null(shared$diagnostics_plot_base64) && nchar(shared$diagnostics_plot_base64) > 0)
+
+      if (has_figures) {
+        html <- paste0(html, '<h2>Figures</h2>')
+      }
+
+      # Custom plots from Plots tab
       if (!is.null(shared$plot_base64) && nchar(shared$plot_base64) > 0) {
         plot_title <- "Model Plots"
         if (!is.null(shared$plots) && length(shared$plots) > 0) {
           plot_title <- shared$plots[[1]]$title
+          fig_num <- fig_num + 1
         }
         html <- paste0(html,
-          '<h2>Figures</h2>',
-          '<p><strong>', htmltools::htmlEscape(plot_title), '</strong></p>',
+          '<p><strong>Figure ', fig_num, ': ', htmltools::htmlEscape(plot_title), '</strong></p>',
           '<img src="', shared$plot_base64, '" ',
           'style="max-width:100%; height:auto; border:1px solid #ddd; margin:10px 0;" ',
           'alt="Model plot" />')
@@ -1906,6 +2055,26 @@ results_server <- function(id, shared) {
             html <- paste0(html, htmltools::htmlEscape(pd$description), '<br/>')
           }
           html <- paste0(html, '</p>')
+        }
+      }
+
+      # Diagnostics forest plot
+      if (!is.null(shared$diagnostics_plot_base64) && nchar(shared$diagnostics_plot_base64) > 0) {
+        fig_num <- fig_num + 1
+        diag_title <- "Forest Plot"
+        if (!is.null(shared$diagnostics_plot)) {
+          diag_title <- shared$diagnostics_plot$title
+        }
+        html <- paste0(html,
+          '<p><strong>Figure ', fig_num, ': ', htmltools::htmlEscape(diag_title), '</strong></p>',
+          '<img src="', shared$diagnostics_plot_base64, '" ',
+          'style="max-width:100%; height:auto; border:1px solid #ddd; margin:10px 0;" ',
+          'alt="Forest plot" />')
+        if (!is.null(shared$diagnostics_plot)) {
+          html <- paste0(html,
+            '<p style="font-size:0.9em; color:#666;">',
+            htmltools::htmlEscape(shared$diagnostics_plot$description),
+            '</p>')
         }
       }
 
@@ -1952,17 +2121,37 @@ results_server <- function(id, shared) {
           )), collapse = "\n"), "")
       }
 
-      if (!is.null(shared$plots) && length(shared$plots) > 0) {
+      # Figures
+      fig_num <- 0
+      has_figures <- (!is.null(shared$plots) && length(shared$plots) > 0) ||
+                     !is.null(shared$diagnostics_plot)
+
+      if (has_figures) {
         lines <- c(lines, "FIGURES", "")
+      }
+
+      if (!is.null(shared$plots) && length(shared$plots) > 0) {
         for (i in seq_along(shared$plots)) {
+          fig_num <- fig_num + 1
           pd <- shared$plots[[i]]
-          lines <- c(lines, paste0("  Figure ", i, ": ", pd$title),
+          lines <- c(lines, paste0("  Figure ", fig_num, ": ", pd$title),
                      paste0("  ", pd$description))
           if (!is.null(pd$details) && nchar(pd$details) > 0) {
             lines <- c(lines, paste0("  Values: ", pd$details))
           }
           lines <- c(lines, "")
         }
+      }
+
+      if (!is.null(shared$diagnostics_plot)) {
+        fig_num <- fig_num + 1
+        pd <- shared$diagnostics_plot
+        lines <- c(lines, paste0("  Figure ", fig_num, ": ", pd$title),
+                   paste0("  ", pd$description))
+        if (!is.null(pd$details) && nchar(pd$details) > 0) {
+          lines <- c(lines, paste0("  Values: ", pd$details))
+        }
+        lines <- c(lines, "")
       }
 
       session$sendCustomMessage("updateReportText",
@@ -2241,6 +2430,8 @@ server <- function(input, output, session) {
     model_result = NULL,
     plots = NULL,
     plot_base64 = NULL,
+    diagnostics_plot = NULL,
+    diagnostics_plot_base64 = NULL,
     last_export = NULL
   )
 
