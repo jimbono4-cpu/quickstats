@@ -543,7 +543,9 @@ table1_server <- function(id, shared) {
           df_sub,
           by = by_var,
           missing = "ifany",
-          statistic = if (length(stat_list) > 0) stat_list else NULL
+          statistic = if (length(stat_list) > 0) stat_list else NULL,
+          digits = list(gtsummary::all_continuous() ~ 2,
+                        gtsummary::all_categorical() ~ c(0, 1))
         )
         # Add stat label column (e.g. "n (%)", "Median (IQR)", "Mean (SD)")
         tbl <- gtsummary::add_stat_label(tbl, location = "column")
