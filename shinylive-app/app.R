@@ -500,10 +500,41 @@ table1_server <- function(id, shared) {
       }
 
       tryCatch({
+        # Test normality for each continuous variable to choose Mean (SD) vs Median (IQR)
+        vt <- shared$var_types
+        stat_list <- list()
+        analysis_vars <- setdiff(cols, by_var)
+
+        for (v in analysis_vars) {
+          is_cat <- is.factor(df_sub[[v]]) || is.character(df_sub[[v]]) ||
+                    (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
+          if (is_cat) next
+
+          # Continuous variable: test normality via Shapiro-Wilk
+          x <- na.omit(df_sub[[v]])
+          if (length(x) < 3) next
+
+          is_normal <- tryCatch({
+            # Shapiro-Wilk limited to n=5000; subsample if larger
+            if (length(x) > 5000) {
+              set.seed(42)
+              x <- sample(x, 5000)
+            }
+            shapiro.test(x)$p.value > 0.05
+          }, error = function(e) FALSE)
+
+          if (is_normal) {
+            stat_list[[v]] <- "{mean} ({sd})"
+          } else {
+            stat_list[[v]] <- "{median} ({p25}, {p75})"
+          }
+        }
+
         tbl <- gtsummary::tbl_summary(
           df_sub,
           by = by_var,
-          missing = "ifany"
+          missing = "ifany",
+          statistic = if (length(stat_list) > 0) stat_list else NULL
         )
         # Add stat label column (e.g. "n (%)", "Median (IQR)", "Mean (SD)")
         tbl <- gtsummary::add_stat_label(tbl, location = "column")
