@@ -520,6 +520,8 @@ table1_server <- function(id, shared) {
           by = by_var,
           missing = "ifany"
         )
+        # Add stat label column (e.g. "n (%)", "Median (IQR)", "Mean (SD)")
+        tbl <- gtsummary::add_stat_label(tbl, location = "column")
         if (input$add_p && !is.null(by_var)) {
           tbl <- gtsummary::add_p(tbl)
         }
