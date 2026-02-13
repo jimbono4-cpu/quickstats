@@ -438,6 +438,12 @@ table1_ui <- function(id) {
                       choices = c("(none)" = ""), selected = ""),
           checkboxInput(ns("add_overall"), "Add overall column", value = FALSE),
           checkboxInput(ns("add_p"), "Add p-values", value = FALSE),
+          checkboxInput(ns("test_normality"), "Test normality (use Median [IQR] if non-normal)",
+                        value = FALSE),
+          p(class = "text-muted small",
+            "Default: Mean (SD) for all continuous variables.",
+            "Tick to run Shapiro-Wilk test; non-normal variables (p \u2264 0.05)",
+            "switch to Median (IQR)."),
           hr(),
           actionButton(ns("generate"), "Generate Table 1",
                        class = "btn-primary"),
@@ -500,7 +506,7 @@ table1_server <- function(id, shared) {
       }
 
       tryCatch({
-        # Test normality for each continuous variable to choose Mean (SD) vs Median (IQR)
+        # Build statistic list for continuous variables
         vt <- shared$var_types
         stat_list <- list()
         analysis_vars <- setdiff(cols, by_var)
@@ -510,23 +516,26 @@ table1_server <- function(id, shared) {
                     (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
           if (is_cat) next
 
-          # Continuous variable: test normality via Shapiro-Wilk
-          x <- na.omit(df_sub[[v]])
-          if (length(x) < 3) next
+          # Default: Mean (SD) for all continuous variables
+          stat_list[[v]] <- "{mean} ({sd})"
 
-          is_normal <- tryCatch({
-            # Shapiro-Wilk limited to n=5000; subsample if larger
-            if (length(x) > 5000) {
-              set.seed(42)
-              x <- sample(x, 5000)
+          # If normality testing enabled, check and switch non-normal to Median (IQR)
+          if (isTRUE(input$test_normality)) {
+            x <- na.omit(df_sub[[v]])
+            if (length(x) >= 3) {
+              is_normal <- tryCatch({
+                # Shapiro-Wilk limited to n=5000; subsample if larger
+                if (length(x) > 5000) {
+                  set.seed(42)
+                  x <- sample(x, 5000)
+                }
+                shapiro.test(x)$p.value > 0.05
+              }, error = function(e) TRUE)  # assume normal on error
+
+              if (!is_normal) {
+                stat_list[[v]] <- "{median} ({p25}, {p75})"
+              }
             }
-            shapiro.test(x)$p.value > 0.05
-          }, error = function(e) FALSE)
-
-          if (is_normal) {
-            stat_list[[v]] <- "{mean} ({sd})"
-          } else {
-            stat_list[[v]] <- "{median} ({p25}, {p75})"
           }
         }
 
