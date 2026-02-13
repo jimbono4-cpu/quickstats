@@ -605,6 +605,19 @@ model_ui <- function(id) {
               uiOutput(ns("model_results"))
             )
           ),
+          tabPanel("Plots",
+            div(style = "margin-top: 10px;",
+              uiOutput(ns("plot_controls")),
+              hr(),
+              plotOutput(ns("model_plot"), height = "500px"),
+              div(style = "margin-top: 10px;",
+                actionButton(ns("download_plot"), "Download Plot (PNG)",
+                             class = "btn-outline-secondary btn-sm"),
+                actionButton(ns("copy_plot"), "Copy Plot to Clipboard",
+                             class = "btn-outline-secondary btn-sm")
+              )
+            )
+          ),
           tabPanel("Diagnostics",
             uiOutput(ns("diagnostics_output")),
             plotOutput(ns("forest_plot"), height = "400px")
@@ -895,6 +908,292 @@ model_server <- function(id, shared) {
         ggplot2::labs(title = "Forest Plot", x = x_label, y = "") +
         ggplot2::theme_minimal(base_size = 14)
     })
+
+    # --- Plots tab: model-appropriate visualizations ---
+
+    # Dynamic controls based on model type
+    output$plot_controls <- renderUI({
+      mod <- model_fit()
+      if (is.null(mod)) {
+        return(p(class = "text-muted", "Fit a model first (Results tab), then select variables to plot."))
+      }
+      mtype <- input$model_type
+      preds <- input$predictors
+      outcome <- input$outcome
+      if (length(preds) == 0) return(NULL)
+
+      # For logistic/cox: forest plot is primary — let user pick which terms
+      if (mtype %in% c("glm", "cox")) {
+        tidy_df <- model_tidy()
+        if (is.null(tidy_df)) return(NULL)
+        terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
+        tagList(
+          p(strong("Forest Plot"), "— select terms to display:"),
+          checkboxGroupInput(ns("plot_terms"), NULL,
+            choices = terms_no_int, selected = terms_no_int)
+        )
+      } else {
+        # For lm/lmer: exposure vs outcome plots — user picks predictors
+        tagList(
+          p(strong("Exposure vs Outcome Plots"), "— select predictors:"),
+          checkboxGroupInput(ns("plot_vars"), NULL,
+            choices = preds, selected = preds[1]),
+          p(class = "text-muted small",
+            "Numeric predictors: scatter + regression line. ",
+            "Categorical predictors: box plot.")
+        )
+      }
+    })
+
+    # The reactive that builds the plot object
+    current_plot <- reactive({
+      mod <- model_fit()
+      if (is.null(mod)) return(NULL)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
+      mtype <- input$model_type
+
+      if (mtype %in% c("glm", "cox")) {
+        # Forest plot of selected terms
+        tidy_df <- model_tidy()
+        if (is.null(tidy_df)) return(NULL)
+        sel <- input$plot_terms
+        if (is.null(sel) || length(sel) == 0) return(NULL)
+
+        plot_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+        if (nrow(plot_df) == 0) return(NULL)
+
+        plot_df$est <- plot_df$OR_HR
+        plot_df$lo <- plot_df$ci_lower
+        plot_df$hi <- plot_df$ci_upper
+        x_label <- if (mtype == "glm") "Odds Ratio (95% CI)" else "Hazard Ratio (95% CI)"
+
+        plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
+
+        p_sig <- ifelse(as.numeric(gsub("<", "", plot_df$p.value)) < 0.05, "p < 0.05", "n.s.")
+        plot_df$label <- paste0(round(plot_df$est, 2), " [",
+                                round(plot_df$lo, 2), "-", round(plot_df$hi, 2), "]")
+
+        ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+          ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+          ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
+          ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
+                                  height = 0.25, color = "#4e79a7", linewidth = 0.8) +
+          ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
+          ggplot2::labs(
+            title = paste("Forest Plot:", if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"),
+            x = x_label, y = "") +
+          ggplot2::theme_minimal(base_size = 13) +
+          ggplot2::theme(
+            panel.grid.major.y = ggplot2::element_blank(),
+            plot.title = ggplot2::element_text(face = "bold"))
+      } else {
+        # lm or lmer: scatter/box plots for selected predictors
+        sel <- input$plot_vars
+        if (is.null(sel) || length(sel) == 0) return(NULL)
+        outcome <- input$outcome
+        df <- shared$data
+        if (is.null(df)) return(NULL)
+
+        # Prepare data
+        if (!is.null(shared$var_types)) {
+          df <- prepare_model_data(df, shared$var_types)
+        }
+
+        # Build a list of plots, one per selected predictor
+        plot_list <- lapply(sel, function(v) {
+          vt <- shared$var_types
+          is_cat <- (!is.null(vt) && v %in% vt$variable &&
+                     vt$type[vt$variable == v] == "categorical") ||
+                    is.factor(df[[v]]) || is.character(df[[v]])
+
+          if (is_cat) {
+            # Box plot
+            ggplot2::ggplot(df, ggplot2::aes(x = factor(.data[[v]]), y = .data[[outcome]])) +
+              ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5, outlier.size = 1) +
+              ggplot2::stat_summary(fun = mean, geom = "point", shape = 18,
+                                   size = 3, color = "#e15759") +
+              ggplot2::labs(title = paste(outcome, "by", v), x = v, y = outcome) +
+              ggplot2::theme_minimal(base_size = 12) +
+              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
+          } else {
+            # Scatter plot with regression line
+            ggplot2::ggplot(df, ggplot2::aes(x = .data[[v]], y = .data[[outcome]])) +
+              ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
+              ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759",
+                                  fill = "#e15759", alpha = 0.15) +
+              ggplot2::labs(title = paste(outcome, "vs", v), x = v, y = outcome) +
+              ggplot2::theme_minimal(base_size = 12) +
+              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
+          }
+        })
+
+        # Arrange in a grid
+        if (length(plot_list) == 1) {
+          plot_list[[1]]
+        } else {
+          # Use patchwork-like manual arrangement with gridExtra if available,
+          # otherwise just show the first plot
+          tryCatch({
+            do.call(gridExtra::grid.arrange,
+                    c(plot_list, ncol = min(2, length(plot_list))))
+          }, error = function(e) {
+            # Fallback: just first plot if gridExtra not available
+            plot_list[[1]]
+          })
+        }
+      }
+    })
+
+    output$model_plot <- renderPlot({
+      current_plot()
+    })
+
+    # Store plot info in shared for reports/LLM
+    observe({
+      mod <- model_fit()
+      if (is.null(mod)) {
+        shared$plots <- NULL
+        return()
+      }
+      mtype <- input$model_type
+
+      # Build descriptions of what was plotted
+      plot_descriptions <- list()
+
+      if (mtype %in% c("glm", "cox")) {
+        sel <- input$plot_terms
+        if (!is.null(sel) && length(sel) > 0) {
+          label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
+          tidy_df <- model_tidy()
+          if (!is.null(tidy_df)) {
+            sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+            desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
+              r <- sub_df[i, ]
+              paste0(r$term, ": ", round(r$OR_HR, 2),
+                     " [", round(r$ci_lower, 2), "-", round(r$ci_upper, 2), "]",
+                     ", p=", if (r$p.value < 0.001) "<0.001" else round(r$p.value, 3))
+            })
+            plot_descriptions <- list(list(
+              type = "forest_plot",
+              title = paste("Forest Plot:", label),
+              description = paste0("Forest plot showing ", label,
+                " with 95% CIs for: ", paste(sel, collapse = ", "), "."),
+              details = paste(desc_items, collapse = "; ")
+            ))
+          }
+        }
+      } else {
+        sel <- input$plot_vars
+        outcome <- input$outcome
+        if (!is.null(sel) && length(sel) > 0 && !is.null(outcome)) {
+          vt <- shared$var_types
+          plot_descriptions <- lapply(sel, function(v) {
+            is_cat <- (!is.null(vt) && v %in% vt$variable &&
+                       vt$type[vt$variable == v] == "categorical")
+            if (is_cat) {
+              list(type = "box_plot",
+                   title = paste(outcome, "by", v),
+                   description = paste0("Box plot of ", outcome, " by levels of ", v,
+                     " (categorical). Red diamond = group mean."))
+            } else {
+              list(type = "scatter_plot",
+                   title = paste(outcome, "vs", v),
+                   description = paste0("Scatter plot of ", outcome, " vs ", v,
+                     " (continuous) with linear regression line and 95% CI band."))
+            }
+          })
+        }
+      }
+
+      shared$plots <- plot_descriptions
+    })
+
+    # Generate base64 PNG of the current plot for embedding in reports
+    get_plot_base64 <- function() {
+      p <- current_plot()
+      if (is.null(p)) return(NULL)
+      tryCatch({
+        tmp <- tempfile(fileext = ".png")
+        grDevices::png(tmp, width = 800, height = 500, res = 120)
+        if (inherits(p, "ggplot")) {
+          print(p)
+        } else {
+          # gridExtra already drew to device in renderPlot; re-render here
+          df <- shared$data
+          if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
+          sel <- input$plot_vars
+          outcome <- input$outcome
+          plot_list <- lapply(sel, function(v) {
+            vt <- shared$var_types
+            is_cat <- (!is.null(vt) && v %in% vt$variable &&
+                       vt$type[vt$variable == v] == "categorical") ||
+                      is.factor(df[[v]]) || is.character(df[[v]])
+            if (is_cat) {
+              ggplot2::ggplot(df, ggplot2::aes(x = factor(.data[[v]]), y = .data[[outcome]])) +
+                ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5) +
+                ggplot2::labs(title = paste(outcome, "by", v), x = v, y = outcome) +
+                ggplot2::theme_minimal(base_size = 12)
+            } else {
+              ggplot2::ggplot(df, ggplot2::aes(x = .data[[v]], y = .data[[outcome]])) +
+                ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
+                ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759") +
+                ggplot2::labs(title = paste(outcome, "vs", v), x = v, y = outcome) +
+                ggplot2::theme_minimal(base_size = 12)
+            }
+          })
+          tryCatch(
+            do.call(gridExtra::grid.arrange, c(plot_list, ncol = min(2, length(plot_list)))),
+            error = function(e) print(plot_list[[1]])
+          )
+        }
+        grDevices::dev.off()
+        raw <- readBin(tmp, "raw", file.info(tmp)$size)
+        unlink(tmp)
+        paste0("data:image/png;base64,", base64enc::base64encode(raw))
+      }, error = function(e) NULL)
+    }
+
+    # Download plot as PNG
+    observeEvent(input$download_plot, {
+      p <- current_plot()
+      if (is.null(p)) {
+        showNotification("No plot to download. Select variables and fit a model first.", type = "warning")
+        return()
+      }
+      b64 <- get_plot_base64()
+      if (is.null(b64)) {
+        showNotification("Could not generate plot image.", type = "error")
+        return()
+      }
+      session$sendCustomMessage("downloadPlotPNG", list(data = b64, filename = "model_plot.png"))
+    })
+
+    # Copy plot to clipboard
+    observeEvent(input$copy_plot, {
+      p <- current_plot()
+      if (is.null(p)) {
+        showNotification("No plot to copy. Select variables and fit a model first.", type = "warning")
+        return()
+      }
+      b64 <- get_plot_base64()
+      if (is.null(b64)) {
+        showNotification("Could not generate plot image.", type = "error")
+        return()
+      }
+      session$sendCustomMessage("copyPlotToClipboard", list(data = b64))
+    })
+
+    # Store base64 for report use
+    observe({
+      mod <- model_fit()
+      if (is.null(mod)) {
+        shared$plot_base64 <- NULL
+        return()
+      }
+      # Defer to avoid running before plot is ready
+      invalidateLater(1000)
+      shared$plot_base64 <- tryCatch(get_plot_base64(), error = function(e) NULL)
+    })
   })
 }
 
@@ -922,6 +1221,9 @@ results_ui <- function(id) {
               ),
               tabPanel("Regression",
                 uiOutput(ns("show_regression"))
+              ),
+              tabPanel("Plots",
+                uiOutput(ns("show_plots"))
               ),
               tabPanel("Methods & Results Draft",
                 h5("Automated Methods & Results Drafting"),
@@ -1051,6 +1353,25 @@ results_server <- function(id, shared) {
       }, error = function(e) {
         HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
       })
+    })
+
+    output$show_plots <- renderUI({
+      b64 <- shared$plot_base64
+      plots_desc <- shared$plots
+      if (is.null(b64) || nchar(b64) == 0) {
+        return(p(class = "text-muted", "No plots generated yet. Go to Step 4 > Plots tab."))
+      }
+      desc_tags <- list()
+      if (!is.null(plots_desc) && length(plots_desc) > 0) {
+        desc_tags <- lapply(seq_along(plots_desc), function(i) {
+          pd <- plots_desc[[i]]
+          p(strong(paste0("Figure ", i, ": ")), pd$description)
+        })
+      }
+      tagList(
+        tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd;"),
+        desc_tags
+      )
     })
 
     output$show_regression <- renderUI({
@@ -1189,13 +1510,19 @@ results_server <- function(id, shared) {
         )
       }
 
+      # Plots
+      if (!is.null(shared$plots) && length(shared$plots) > 0) {
+        manifest$plots <- shared$plots
+      }
+
       # Software
       manifest$software <- list(
         r_version = R.version.string,
         packages = paste(
           c("gt", "gtsummary", "ggplot2", "broom", "labelled",
             "survival", "sandwich", "lmtest", "car", "emmeans",
-            "haven", "readxl", "writexl", "lme4"),
+            "haven", "readxl", "writexl", "lme4",
+            "gridExtra", "base64enc"),
           collapse = ", "
         ),
         platform = "WebR (R compiled to WebAssembly, running in-browser)"
@@ -1230,6 +1557,14 @@ results_server <- function(id, shared) {
         items <- c(items, list(
           p(strong("Model:"), manifest$model$type),
           p(strong("Formula:"), tags$code(manifest$model$formula))
+        ))
+      }
+
+      if (!is.null(manifest$plots) && length(manifest$plots) > 0) {
+        plot_types <- sapply(manifest$plots, function(pd) pd$type)
+        items <- c(items, list(
+          p(strong("Plots:"), length(manifest$plots), "figure(s) generated —",
+            paste(unique(plot_types), collapse = ", "))
         ))
       }
 
@@ -1349,6 +1684,26 @@ results_server <- function(id, shared) {
         }
       }
 
+      # Plots / Figures
+      if (!is.null(manifest$plots) && length(manifest$plots) > 0) {
+        prompt_lines <- c(prompt_lines,
+          "### Figures Generated",
+          paste0("The following ", length(manifest$plots), " figure(s) were generated by the app:"),
+          "")
+        for (i in seq_along(manifest$plots)) {
+          pd <- manifest$plots[[i]]
+          prompt_lines <- c(prompt_lines,
+            paste0("**Figure ", i, ": ", pd$title, "**"),
+            paste0("- Type: ", pd$type),
+            paste0("- Description: ", pd$description))
+          if (!is.null(pd$details) && nchar(pd$details) > 0) {
+            prompt_lines <- c(prompt_lines,
+              paste0("- Key values: ", pd$details))
+          }
+          prompt_lines <- c(prompt_lines, "")
+        }
+      }
+
       # Software
       prompt_lines <- c(prompt_lines,
         "### Software",
@@ -1375,8 +1730,9 @@ results_server <- function(id, shared) {
         "### 2. Results Section",
         "   - Participant flow and sample characteristics",
         "   - Primary and secondary outcome results",
-        "   - In-text references to tables and figures (e.g. 'Table 1', 'Table 2')",
+        "   - In-text references to tables and figures (e.g. 'Table 1', 'Table 2', 'Figure 1')",
         "   - Effect estimates with confidence intervals and p-values reported in-text",
+        "   - Reference any generated figures with appropriate captions (see 'Figures Generated' above)",
         "",
         "### 3. Table 1 — Baseline Characteristics",
         "Generate a **journal-ready Table 1** from the descriptive statistics above.",
@@ -1399,6 +1755,15 @@ results_server <- function(id, shared) {
         "   - Add a footnote row with: model type, sample size, R-squared or C-statistic (if available),",
         "     and any notes about robust standard errors or clustering",
         "   - Use the exact terms and values from the supplied coefficients — do NOT invent additional results",
+        "",
+        "### 5. Figure Captions",
+        "For each figure listed in the 'Figures Generated' section above,",
+        "provide a journal-ready figure caption including:",
+        "   - Figure number (e.g. 'Figure 1.')",
+        "   - A descriptive title",
+        "   - Explanation of what is shown (axes, error bars, reference lines)",
+        "   - Any abbreviations used",
+        "   - Use ONLY figures that were actually generated — do NOT invent additional figures",
         "",
         "Write for a general medical/scientific journal audience (e.g. BMJ, JAMA style).",
         "Tables should be formatted in plain text with clear column alignment,",
@@ -1522,6 +1887,28 @@ results_server <- function(id, shared) {
         html <- paste0(html, '<h2>Regression Results</h2>', regression_html)
       }
 
+      # Plots section
+      if (!is.null(shared$plot_base64) && nchar(shared$plot_base64) > 0) {
+        plot_title <- "Model Plots"
+        if (!is.null(shared$plots) && length(shared$plots) > 0) {
+          plot_title <- shared$plots[[1]]$title
+        }
+        html <- paste0(html,
+          '<h2>Figures</h2>',
+          '<p><strong>', htmltools::htmlEscape(plot_title), '</strong></p>',
+          '<img src="', shared$plot_base64, '" ',
+          'style="max-width:100%; height:auto; border:1px solid #ddd; margin:10px 0;" ',
+          'alt="Model plot" />')
+        # Add figure descriptions
+        if (!is.null(shared$plots) && length(shared$plots) > 0) {
+          html <- paste0(html, '<p style="font-size:0.9em; color:#666;">')
+          for (pd in shared$plots) {
+            html <- paste0(html, htmltools::htmlEscape(pd$description), '<br/>')
+          }
+          html <- paste0(html, '</p>')
+        }
+      }
+
       html <- paste0(html, '</body></html>')
       html
     }
@@ -1563,6 +1950,19 @@ results_server <- function(id, shared) {
               stringsAsFactors = FALSE
             ), row.names = FALSE
           )), collapse = "\n"), "")
+      }
+
+      if (!is.null(shared$plots) && length(shared$plots) > 0) {
+        lines <- c(lines, "FIGURES", "")
+        for (i in seq_along(shared$plots)) {
+          pd <- shared$plots[[i]]
+          lines <- c(lines, paste0("  Figure ", i, ": ", pd$title),
+                     paste0("  ", pd$description))
+          if (!is.null(pd$details) && nchar(pd$details) > 0) {
+            lines <- c(lines, paste0("  Values: ", pd$details))
+          }
+          lines <- c(lines, "")
+        }
       }
 
       session$sendCustomMessage("updateReportText",
@@ -1700,6 +2100,33 @@ ui <- fluidPage(
         });
       });
 
+      // Download plot as PNG from base64
+      Shiny.addCustomMessageHandler('downloadPlotPNG', function(msg) {
+        var a = document.createElement('a');
+        a.href = msg.data;
+        a.download = msg.filename || 'plot.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+
+      // Copy plot to clipboard as PNG
+      Shiny.addCustomMessageHandler('copyPlotToClipboard', function(msg) {
+        fetch(msg.data)
+          .then(function(res) { return res.blob(); })
+          .then(function(blob) {
+            var item = new ClipboardItem({'image/png': blob});
+            navigator.clipboard.write([item]).then(function() {
+              // success
+            }).catch(function(err) {
+              alert('Could not copy plot to clipboard. Try the download button instead.');
+            });
+          })
+          .catch(function() {
+            alert('Could not process plot image. Try the download button instead.');
+          });
+      });
+
       // Loading progress updates
       Shiny.addCustomMessageHandler('updateLoadingProgress', function(msg) {
         var bar = document.querySelector('#loading-overlay .progress-bar-fill');
@@ -1812,6 +2239,8 @@ server <- function(input, output, session) {
     var_types = NULL,
     table1 = NULL,
     model_result = NULL,
+    plots = NULL,
+    plot_base64 = NULL,
     last_export = NULL
   )
 
@@ -1820,7 +2249,8 @@ server <- function(input, output, session) {
   observe({
     pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
-              "haven", "readxl", "writexl", "lme4")
+              "haven", "readxl", "writexl", "lme4",
+              "gridExtra", "base64enc")
     total <- length(pkgs)
 
     for (i in seq_along(pkgs)) {
