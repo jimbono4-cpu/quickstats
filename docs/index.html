@@ -524,6 +524,8 @@ table1_server <- function(id, shared) {
         # Build statistic list for continuous variables
         vt <- shared$var_types
         stat_list <- list()
+        normal_vars <- c()     # track which vars are normal
+        nonnormal_vars <- c()  # track which vars are non-normal
         analysis_vars <- setdiff(cols, by_var)
 
         for (v in analysis_vars) {
@@ -533,6 +535,7 @@ table1_server <- function(id, shared) {
 
           # Default: Mean (SD) for all continuous variables
           stat_list[[v]] <- "{mean} ({sd})"
+          normal_vars <- c(normal_vars, v)
 
           # If normality testing enabled, check and switch non-normal to Median (IQR)
           if (isTRUE(input$test_normality)) {
@@ -549,6 +552,8 @@ table1_server <- function(id, shared) {
 
               if (!is_normal) {
                 stat_list[[v]] <- "{median} ({p25}, {p75})"
+                normal_vars <- setdiff(normal_vars, v)
+                nonnormal_vars <- c(nonnormal_vars, v)
               }
             }
           }
@@ -565,7 +570,26 @@ table1_server <- function(id, shared) {
         # Add stat label column (e.g. "n (%)", "Median (IQR)", "Mean (SD)")
         tbl <- gtsummary::add_stat_label(tbl, location = "column")
         if (input$add_p && !is.null(by_var)) {
-          tbl <- gtsummary::add_p(tbl)
+          # Build test map aligned with normality decisions
+          # Determine number of stratification groups
+          n_groups <- length(unique(na.omit(df_sub[[by_var]])))
+
+          test_list <- list()
+          # Normal continuous: parametric tests
+          for (v in normal_vars) {
+            test_list[[v]] <- if (n_groups == 2) "t.test" else "aov"
+          }
+          # Non-normal continuous: non-parametric tests
+          for (v in nonnormal_vars) {
+            test_list[[v]] <- if (n_groups == 2) "wilcox.test" else "kruskal.test"
+          }
+          # Categorical/binary: use gtsummary defaults (chisq.test / fisher.test)
+
+          if (length(test_list) > 0) {
+            tbl <- gtsummary::add_p(tbl, test = test_list)
+          } else {
+            tbl <- gtsummary::add_p(tbl)
+          }
         }
         if (input$add_overall && !is.null(by_var)) {
           tbl <- gtsummary::add_overall(tbl)
