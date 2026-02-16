@@ -579,6 +579,11 @@ table1_server <- function(id, shared) {
         if (input$add_overall && !is.null(by_var)) {
           tbl <- gtsummary::add_overall(tbl)
         }
+        # Add title with sample size
+        n_table1 <- nrow(df_sub)
+        tbl <- gtsummary::modify_caption(tbl,
+          paste0("**Table 1. Characteristics of participants (N = ", n_table1, ")**"))
+
         table1_obj(tbl)
         shared$table1 <- tbl
         showNotification("Table 1 generated", type = "message")
@@ -630,6 +635,11 @@ model_ui <- function(id) {
       column(4,
         div(class = "well",
           h4("Model Specification"),
+          div(class = "alert alert-info", style = "font-size: 13px; padding: 8px 12px;",
+            tags$strong("Missing data: "),
+            "Complete case analysis (listwise deletion) is used. ",
+            "Observations with missing values in the outcome or any predictor variable are excluded from the model."
+          ),
           selectInput(ns("outcome"), "Outcome variable:", choices = NULL),
           selectInput(ns("model_type"), "Model type:", choices = c(
             "Linear regression" = "lm",
@@ -731,6 +741,7 @@ model_server <- function(id, shared) {
 
     model_fit <- reactiveVal(NULL)
     model_tidy <- reactiveVal(NULL)
+    model_missing_info <- reactiveVal(NULL)
 
     observeEvent(input$fit_model, {
       req(shared$data)
@@ -827,7 +838,22 @@ model_server <- function(id, shared) {
 
         model_tidy(tidy_df)
         shared$model_result <- list(fit = mod, tidy = tidy_df, type = input$model_type)
-        showNotification("Model fitted successfully", type = "message")
+
+        # Calculate observations dropped due to missing data
+        n_total <- nrow(df)
+        n_used <- nobs(mod)
+        n_dropped <- n_total - n_used
+        model_missing_info(list(n_total = n_total, n_used = n_used, n_dropped = n_dropped))
+
+        if (n_dropped > 0) {
+          showNotification(
+            paste0("Model fitted. ", n_dropped, " of ", n_total,
+                   " observations (", round(100 * n_dropped / n_total, 1),
+                   "%) excluded due to missing data."),
+            type = "warning", duration = 10)
+        } else {
+          showNotification("Model fitted successfully. No observations excluded.", type = "message")
+        }
 
       }, error = function(e) {
         showNotification(paste("Model error:", conditionMessage(e)), type = "error")
@@ -839,6 +865,27 @@ model_server <- function(id, shared) {
       if (is.null(tidy_df)) {
         return(p(class = "text-muted", "Configure model and click 'Fit Model'"))
       }
+
+      # Missing data summary banner
+      miss_info <- model_missing_info()
+      missing_banner <- NULL
+      if (!is.null(miss_info)) {
+        if (miss_info$n_dropped > 0) {
+          missing_banner <- div(class = "alert alert-warning", style = "font-size: 13px;",
+            tags$strong("Missing data: "),
+            paste0(miss_info$n_dropped, " of ", miss_info$n_total, " observations (",
+                   round(100 * miss_info$n_dropped / miss_info$n_total, 1),
+                   "%) were excluded due to missing values (complete case analysis). ",
+                   "Model fitted on ", miss_info$n_used, " complete observations."))
+        } else {
+          missing_banner <- div(class = "alert alert-success", style = "font-size: 13px;",
+            tags$strong("Missing data: "),
+            paste0("No observations excluded. Model fitted on all ", miss_info$n_total, " observations."))
+        }
+      }
+
+      # Get analytical sample size for table title
+      n_analytical <- if (!is.null(miss_info)) miss_info$n_used else "?"
 
       # Format table
       display_df <- tidy_df
@@ -854,22 +901,28 @@ model_server <- function(id, shared) {
 
       if (requireNamespace("gt", quietly = TRUE)) {
         tryCatch({
+          # Build Table 2 title naming the estimate
+          estimate_desc <- switch(input$model_type,
+            "lm" = "Linear regression coefficients",
+            "glm" = "Odds ratios from logistic regression",
+            "cox" = "Hazard ratios from Cox proportional hazards regression",
+            "lmer" = "Mixed model coefficients"
+          )
+          table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_analytical, ")")
+
           gt_tbl <- gt::gt(display_df) |>
-            gt::tab_header(title = paste("Regression Results",
-              switch(input$model_type,
-                "lm" = "- Linear Regression",
-                "glm" = "- Logistic Regression",
-                "cox" = "- Cox Proportional Hazards",
-                "lmer" = "- Mixed Model"
-              )))
+            gt::tab_header(title = table2_title)
           # Wrap with id for clipboard
-          HTML(paste0('<div id="', ns("model_results_html"), '">',
+          table_html <- HTML(paste0('<div id="', ns("model_results_html"), '">',
                       gt::as_raw_html(gt_tbl), '</div>'))
+          tagList(missing_banner, table_html)
         }, error = function(e) {
-          HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
+          table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
+          tagList(missing_banner, table_html)
         })
       } else {
-        HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
+        table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
+        tagList(missing_banner, table_html)
       }
     })
 
@@ -974,7 +1027,10 @@ model_server <- function(id, shared) {
         ggplot2::geom_point(size = 3, color = "#4e79a7") +
         ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
         ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
-        ggplot2::labs(title = "Forest Plot — All Predictors", x = x_label, y = "") +
+        miss_info <- model_missing_info()
+        n_diag <- if (!is.null(miss_info)) miss_info$n_used else "?"
+        ggplot2::labs(title = paste0("Forest Plot — All Predictors (N = ", n_diag, ")"),
+                      x = x_label, y = "") +
         ggplot2::theme_minimal(base_size = 14)
     })
 
@@ -1062,8 +1118,31 @@ model_server <- function(id, shared) {
       outcome <- input$outcome
       if (length(preds) == 0) return(NULL)
 
-      # For logistic/cox: forest plot is primary — let user pick which terms
-      if (mtype %in% c("glm", "cox")) {
+      # For Cox: KM curve + forest plot; logistic: forest plot
+      if (mtype == "cox") {
+        tidy_df <- model_tidy()
+        if (is.null(tidy_df)) return(NULL)
+        terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
+        # Identify categorical predictors for KM stratification
+        km_choices <- intersect(preds, names(shared$data))
+        tagList(
+          selectInput(ns("plot_type_cox"), "Plot type:",
+            choices = c("Kaplan-Meier Survival Curve" = "km",
+                        "Forest Plot" = "forest"),
+            selected = "km"),
+          conditionalPanel(
+            condition = paste0("input['", ns("plot_type_cox"), "'] == 'km'"),
+            selectInput(ns("km_strata"), "Stratify survival curve by:",
+              choices = km_choices, selected = km_choices[1])
+          ),
+          conditionalPanel(
+            condition = paste0("input['", ns("plot_type_cox"), "'] == 'forest'"),
+            p(strong("Forest Plot"), "— select terms to display:"),
+            checkboxGroupInput(ns("plot_terms"), NULL,
+              choices = terms_no_int, selected = terms_no_int)
+          )
+        )
+      } else if (mtype == "glm") {
         tidy_df <- model_tidy()
         if (is.null(tidy_df)) return(NULL)
         terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
@@ -1092,7 +1171,55 @@ model_server <- function(id, shared) {
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       mtype <- input$model_type
 
-      if (mtype %in% c("glm", "cox")) {
+      # Get analytical sample size for titles
+      miss_info <- model_missing_info()
+      n_analytical <- if (!is.null(miss_info)) miss_info$n_used else nobs(mod)
+
+      if (mtype == "cox" && !is.null(input$plot_type_cox) && input$plot_type_cox == "km") {
+        # Kaplan-Meier survival curve
+        if (!requireNamespace("survival", quietly = TRUE)) return(NULL)
+        km_var <- input$km_strata
+        if (is.null(km_var) || !(km_var %in% names(shared$data))) return(NULL)
+
+        df <- shared$data
+        if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
+        time_var <- input$time_var
+        event_var <- input$event_var
+
+        # Ensure time and event are numeric
+        if (is.factor(df[[time_var]])) df[[time_var]] <- as.numeric(as.character(df[[time_var]]))
+        if (is.factor(df[[event_var]])) df[[event_var]] <- as.numeric(as.character(df[[event_var]]))
+
+        # Build KM fit
+        km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", event_var, ") ~ ", km_var))
+        km_fit <- survival::survfit(km_formula, data = df)
+
+        # Extract data for plotting
+        km_data <- data.frame(
+          time = km_fit$time,
+          surv = km_fit$surv,
+          upper = km_fit$upper,
+          lower = km_fit$lower,
+          strata = rep(names(km_fit$strata), km_fit$strata)
+        )
+        # Clean strata labels
+        km_data$strata <- gsub(paste0("^", km_var, "="), "", km_data$strata)
+
+        ggplot2::ggplot(km_data, ggplot2::aes(x = time, y = surv, color = strata)) +
+          ggplot2::geom_step(linewidth = 0.9) +
+          ggplot2::geom_step(ggplot2::aes(y = lower), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
+          ggplot2::geom_step(ggplot2::aes(y = upper), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
+          ggplot2::labs(
+            title = paste0("Kaplan-Meier Survival Curve by ", km_var, " (N = ", n_analytical, ")"),
+            x = "Time", y = "Survival Probability",
+            color = km_var, fill = km_var) +
+          ggplot2::scale_y_continuous(limits = c(0, 1)) +
+          ggplot2::theme_minimal(base_size = 13) +
+          ggplot2::theme(
+            plot.title = ggplot2::element_text(face = "bold"),
+            legend.position = "bottom")
+
+      } else if (mtype %in% c("glm", "cox")) {
         # Forest plot of selected terms
         tidy_df <- model_tidy()
         if (is.null(tidy_df)) return(NULL)
@@ -1105,7 +1232,8 @@ model_server <- function(id, shared) {
         plot_df$est <- plot_df$OR_HR
         plot_df$lo <- plot_df$ci_lower
         plot_df$hi <- plot_df$ci_upper
-        x_label <- if (mtype == "glm") "Odds Ratio (95% CI)" else "Hazard Ratio (95% CI)"
+        est_label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
+        x_label <- paste0(est_label, " (95% CI)")
 
         plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
 
@@ -1120,7 +1248,7 @@ model_server <- function(id, shared) {
                                   height = 0.25, color = "#4e79a7", linewidth = 0.8) +
           ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
           ggplot2::labs(
-            title = paste("Forest Plot:", if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"),
+            title = paste0("Forest Plot: ", est_label, " (N = ", n_analytical, ")"),
             x = x_label, y = "") +
           ggplot2::theme_minimal(base_size = 13) +
           ggplot2::theme(
@@ -1152,7 +1280,8 @@ model_server <- function(id, shared) {
               ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5, outlier.size = 1) +
               ggplot2::stat_summary(fun = mean, geom = "point", shape = 18,
                                    size = 3, color = "#e15759") +
-              ggplot2::labs(title = paste(outcome, "by", v), x = v, y = outcome) +
+              ggplot2::labs(title = paste0(outcome, " by ", v, " (N = ", n_analytical, ")"),
+                           x = v, y = outcome) +
               ggplot2::theme_minimal(base_size = 12) +
               ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
           } else {
@@ -1161,7 +1290,8 @@ model_server <- function(id, shared) {
               ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
               ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759",
                                   fill = "#e15759", alpha = 0.15) +
-              ggplot2::labs(title = paste(outcome, "vs", v), x = v, y = outcome) +
+              ggplot2::labs(title = paste0(outcome, " vs ", v, " (N = ", n_analytical, ")"),
+                           x = v, y = outcome) +
               ggplot2::theme_minimal(base_size = 12) +
               ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
           }
