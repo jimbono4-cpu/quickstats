@@ -1676,19 +1676,16 @@ results_ui <- function(id) {
                 uiOutput(ns("show_plots"))
               ),
               tabPanel("Export",
-                h5("Download Report as PDF"),
-                p("Generate a print-ready report containing all your results.",
-                  "Your browser's print dialog will open — select 'Save as PDF'."),
-                actionButton(ns("download_pdf"), "Download Report (PDF)",
-                             class = "btn-primary"),
-                actionButton(ns("preview_report"), "Preview Report",
-                             class = "btn-outline-secondary"),
-                hr(),
-                h5("Results Preview"),
-                tags$textarea(id = ns("report_text"), rows = 20,
-                  style = "width:100%; font-family:monospace; font-size:12px;",
-                  readonly = "readonly",
-                  "Click 'Preview Report' to see results here.")
+                h5("Download Report"),
+                p("Download a report containing all your results, including a statistical methods summary."),
+                div(style = "display: flex; gap: 10px; flex-wrap: wrap;",
+                  actionButton(ns("download_pdf"), "Download as PDF",
+                               class = "btn-primary"),
+                  actionButton(ns("download_txt"), "Download as Text",
+                               class = "btn-outline-primary"),
+                  actionButton(ns("download_word"), "Download as Word",
+                               class = "btn-outline-primary")
+                )
               )
             )
           )
@@ -2211,6 +2208,97 @@ results_server <- function(id, shared) {
     })
 
     # --- HTML report for PDF export ---
+    # Generate a statistical methods summary paragraph
+    build_methods_summary <- function() {
+      parts <- c()
+
+      # Data description
+      if (!is.null(shared$data)) {
+        df <- shared$data
+        n_obs <- nrow(df)
+        n_vars <- ncol(df)
+        n_miss <- sum(is.na(df))
+        parts <- c(parts, paste0(
+          "The analytical dataset comprised ", n_obs, " observations across ",
+          n_vars, " variables", if (n_miss > 0) paste0(
+            " (", n_miss, " missing values, ",
+            round(100 * n_miss / (n_obs * n_vars), 1), "% of all cells)") else "",
+          "."))
+      }
+
+      # Descriptive statistics
+      if (!is.null(shared$table1)) {
+        parts <- c(parts,
+          "Descriptive statistics were summarised using frequencies and percentages for categorical variables and means (standard deviations) or medians (interquartile ranges) for continuous variables, as appropriate.")
+      }
+
+      # Regression model
+      if (!is.null(shared$model_result)) {
+        res <- shared$model_result
+        n_model <- tryCatch(nobs(res$fit), error = function(e) NULL)
+        is_binary_mixed <- isTRUE(res$is_binary_mixed)
+        model_desc <- switch(res$type,
+          "lm" = "Multivariable linear regression was used to estimate regression coefficients with 95% confidence intervals.",
+          "glm" = "Multivariable logistic regression was used to estimate odds ratios (ORs) with 95% confidence intervals.",
+          "cox" = "Cox proportional hazards regression was used to estimate hazard ratios (HRs) with 95% confidence intervals.",
+          "lmer" = if (is_binary_mixed) {
+            "A mixed-effects logistic regression model (generalised linear mixed model with a logit link) was fitted to estimate odds ratios (ORs) with 95% confidence intervals, accounting for clustering using random intercepts."
+          } else {
+            "A linear mixed-effects model was fitted to estimate regression coefficients with 95% confidence intervals, accounting for clustering using random intercepts."
+          },
+          "")
+        parts <- c(parts, model_desc)
+
+        # Missing data handling
+        if (!is.null(n_model) && !is.null(shared$data)) {
+          n_total <- nrow(shared$data)
+          n_dropped <- n_total - n_model
+          if (n_dropped > 0) {
+            parts <- c(parts, paste0(
+              "Complete case analysis was used; ", n_dropped, " observations (",
+              round(100 * n_dropped / n_total, 1),
+              "%) were excluded due to missing data, yielding an analytical sample of ",
+              n_model, " observations."))
+          } else {
+            parts <- c(parts, paste0(
+              "There were no missing data in the analytical variables; all ",
+              n_model, " observations were included."))
+          }
+        }
+
+        # AIC/BIC
+        tryCatch({
+          aic_val <- tryCatch(round(AIC(res$fit), 1), error = function(e) NULL)
+          bic_val <- tryCatch(round(BIC(res$fit), 1), error = function(e) NULL)
+          fit_parts <- c()
+          if (!is.null(aic_val) && is.finite(aic_val)) fit_parts <- c(fit_parts, paste0("AIC = ", aic_val))
+          if (!is.null(bic_val) && is.finite(bic_val)) fit_parts <- c(fit_parts, paste0("BIC = ", bic_val))
+          if (length(fit_parts) > 0) {
+            parts <- c(parts, paste0("Model fit indices: ", paste(fit_parts, collapse = ", "), "."))
+          }
+        }, error = function(e) NULL)
+      }
+
+      # Software
+      pkg_versions <- c()
+      for (pkg in c("gtsummary", "ggplot2", "survival", "lme4")) {
+        if (requireNamespace(pkg, quietly = TRUE)) {
+          ver <- tryCatch(as.character(packageVersion(pkg)), error = function(e) NULL)
+          if (!is.null(ver)) pkg_versions <- c(pkg_versions, paste0(pkg, " v", ver))
+        }
+      }
+      software_text <- paste0(
+        "All analyses were conducted in R (", R.version.string, ") running in the browser via WebR")
+      if (length(pkg_versions) > 0) {
+        software_text <- paste0(software_text, ", using the following packages: ",
+                                paste(pkg_versions, collapse = ", "))
+      }
+      software_text <- paste0(software_text, ". A two-sided p-value < 0.05 was considered statistically significant.")
+      parts <- c(parts, software_text)
+
+      paste(parts, collapse = " ")
+    }
+
     generate_html_report <- function() {
       # Build Table 1 HTML with title
       table1_html <- ""
@@ -2333,6 +2421,13 @@ results_server <- function(id, shared) {
         html <- paste0(html, '<h2>Data Summary</h2>', data_html)
       }
 
+      # Statistical methods summary
+      methods_text <- build_methods_summary()
+      if (nchar(methods_text) > 0) {
+        html <- paste0(html, '<h2>Statistical Methods</h2>',
+                        '<p>', htmltools::htmlEscape(methods_text), '</p>')
+      }
+
       if (nchar(table1_html) > 0) {
         html <- paste0(html, '<h2>', htmltools::htmlEscape(table1_title), '</h2>', table1_html)
       }
@@ -2397,8 +2492,8 @@ results_server <- function(id, shared) {
       html
     }
 
-    # Preview: plain text summary in the textarea
-    observeEvent(input$preview_report, {
+    # Build plain text report content
+    build_text_report <- function() {
       lines <- c(
         "STATISTICAL ANALYSIS REPORT",
         paste0("Generated: ", Sys.time()),
@@ -2414,6 +2509,13 @@ results_server <- function(id, shared) {
           paste0("  Columns: ", ncol(df)),
           paste0("  Missing values: ", sum(is.na(df))),
           "")
+      }
+
+      # Methods summary
+      methods_text <- build_methods_summary()
+      if (nchar(methods_text) > 0) {
+        lines <- c(lines, "STATISTICAL METHODS", "",
+          strwrap(methods_text, width = 80), "")
       }
 
       if (!is.null(shared$table1)) {
@@ -2491,14 +2593,27 @@ results_server <- function(id, shared) {
         lines <- c(lines, "")
       }
 
-      session$sendCustomMessage("updateReportText",
-        list(id = ns("report_text"), text = paste(lines, collapse = "\n")))
-    })
+      paste(lines, collapse = "\n")
+    }
 
     # Download as PDF via browser print dialog
     observeEvent(input$download_pdf, {
       html_report <- generate_html_report()
       session$sendCustomMessage("downloadPDF", list(content = html_report))
+    })
+
+    # Download as plain text file
+    observeEvent(input$download_txt, {
+      text_content <- build_text_report()
+      session$sendCustomMessage("downloadTextFile",
+        list(content = text_content, filename = "analysis_report.txt"))
+    })
+
+    # Download as Word (HTML with Word MIME type)
+    observeEvent(input$download_word, {
+      html_report <- generate_html_report()
+      session$sendCustomMessage("downloadWordFile",
+        list(content = html_report, filename = "analysis_report.doc"))
     })
   })
 }
@@ -2603,6 +2718,36 @@ ui <- fluidPage(
         win.document.close();
         // Wait for content to render, then trigger print
         setTimeout(function() { win.print(); }, 500);
+      });
+
+      // Download as plain text file
+      Shiny.addCustomMessageHandler('downloadTextFile', function(msg) {
+        var blob = new Blob([msg.content], {type: 'text/plain;charset=utf-8'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = msg.filename || 'report.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      });
+
+      // Download as Word (.doc) file
+      Shiny.addCustomMessageHandler('downloadWordFile', function(msg) {
+        var header = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+          'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+          'xmlns="http://www.w3.org/TR/REC-html40">' +
+          '<head><meta charset="utf-8"></head><body>';
+        var footer = '</body></html>';
+        var content = header + msg.content + footer;
+        var blob = new Blob([content], {type: 'application/msword'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = msg.filename || 'report.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
       });
 
       // Update report textarea
