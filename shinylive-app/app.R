@@ -937,12 +937,12 @@ model_server <- function(id, shared) {
       mod <- model_fit()
       if (is.null(mod)) return(p(class = "text-muted", "Fit a model first"))
 
-      diag_html <- ""
+      diag_parts <- list()
 
       # VIF
       if (input$show_vif && input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("car", quietly = TRUE)) {
-          tryCatch({
+          vif_html <- tryCatch({
             vif_vals <- car::vif(mod)
             if (is.matrix(vif_vals)) vif_vals <- vif_vals[, "GVIF"]
             vif_df <- data.frame(
@@ -951,26 +951,25 @@ model_server <- function(id, shared) {
               Flag = ifelse(vif_vals > 10, "HIGH", ifelse(vif_vals > 5, "Moderate", "OK")),
               stringsAsFactors = FALSE
             )
-            diag_html <- paste0(diag_html,
-              "<h5>Variance Inflation Factors (VIF)</h5>",
-              "<p class='text-muted small'>VIF > 5: moderate concern. VIF > 10: serious multicollinearity.</p>")
-            if (requireNamespace("gt", quietly = TRUE)) {
-              diag_html <- paste0(diag_html, gt::as_raw_html(gt::gt(vif_df)))
+            tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
+              gt::as_raw_html(gt::gt(vif_df))
             } else {
-              diag_html <- paste0(diag_html, "<pre>",
-                paste(capture.output(print(vif_df, row.names = FALSE)), collapse = "\n"),
-                "</pre>")
+              paste0("<pre>", paste(capture.output(print(vif_df, row.names = FALSE)), collapse = "\n"), "</pre>")
             }
+            paste0("<h5>Variance Inflation Factors (VIF)</h5>",
+              "<p class='text-muted small'>VIF > 5: moderate concern. VIF > 10: serious multicollinearity.</p>",
+              tbl_html)
           }, error = function(e) {
-            diag_html <- paste0(diag_html, "<p>VIF error: ", conditionMessage(e), "</p>")
+            paste0("<p>VIF error: ", conditionMessage(e), "</p>")
           })
+          diag_parts <- c(diag_parts, list(vif_html))
         }
       }
 
       # Estimated marginal means (lm/glm only)
       if (input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("emmeans", quietly = TRUE)) {
-          tryCatch({
+          emm_html <- tryCatch({
             preds <- input$predictors
             factor_preds <- preds[sapply(shared$data[preds], function(x) {
               is.factor(x) || is.character(x) || (is.numeric(x) && length(unique(na.omit(x))) <= 10)
@@ -978,31 +977,36 @@ model_server <- function(id, shared) {
             if (length(factor_preds) > 0) {
               emm <- emmeans::emmeans(mod, factor_preds[1])
               emm_df <- as.data.frame(summary(emm))
-              diag_html <- paste0(diag_html,
-                "<h5>Estimated Marginal Means: ", factor_preds[1], "</h5>")
-              if (requireNamespace("gt", quietly = TRUE)) {
-                emm_df[] <- lapply(emm_df, function(x) if (is.numeric(x)) round(x, 3) else x)
-                diag_html <- paste0(diag_html, gt::as_raw_html(gt::gt(emm_df)))
+              emm_df[] <- lapply(emm_df, function(x) if (is.numeric(x)) round(x, 3) else x)
+              tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
+                gt::as_raw_html(gt::gt(emm_df))
               } else {
-                diag_html <- paste0(diag_html, "<pre>",
-                  paste(capture.output(print(emm_df)), collapse = "\n"), "</pre>")
+                paste0("<pre>", paste(capture.output(print(emm_df)), collapse = "\n"), "</pre>")
               }
-            }
+              paste0("<h5>Estimated Marginal Means: ", factor_preds[1], "</h5>", tbl_html)
+            } else NULL
           }, error = function(e) NULL)
+          if (!is.null(emm_html)) diag_parts <- c(diag_parts, list(emm_html))
         }
       }
 
       # Cox regression diagnostics
       if (input$model_type == "cox") {
-        tryCatch({
+        cox_html <- tryCatch({
+          parts <- "<h5>Cox Model Diagnostics</h5>"
+
           # Concordance
-          gl <- summary(mod)
-          concordance <- if (!is.null(gl$concordance)) round(gl$concordance[1], 3) else NULL
-          diag_html <- paste0(diag_html,
-            "<h5>Cox Model Diagnostics</h5>")
-          if (!is.null(concordance)) {
-            diag_html <- paste0(diag_html,
-              "<p><strong>Concordance (C-statistic):</strong> ", concordance,
+          concordance_val <- tryCatch({
+            gl <- summary(mod)
+            if (!is.null(gl$concordance)) {
+              c_val <- gl$concordance["C"]
+              if (!is.na(c_val)) round(c_val, 3) else NULL
+            } else NULL
+          }, error = function(e) NULL)
+
+          if (!is.null(concordance_val)) {
+            parts <- paste0(parts,
+              "<p><strong>Concordance (C-statistic):</strong> ", concordance_val,
               " <span class='text-muted small'>(0.5 = no discrimination, 1.0 = perfect)</span></p>")
           }
 
@@ -1016,23 +1020,26 @@ model_server <- function(id, shared) {
           ph_df[["p-value"]] <- ifelse(ph_df[["p-value"]] < 0.001, "<0.001",
                                        round(ph_df[["p-value"]], 4))
 
-          diag_html <- paste0(diag_html,
+          tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
+            gt::as_raw_html(gt::gt(ph_df))
+          } else {
+            paste0("<pre>", paste(capture.output(print(ph_df, row.names = FALSE)), collapse = "\n"), "</pre>")
+          }
+          paste0(parts,
             "<h5>Test of Proportional Hazards Assumption</h5>",
             "<p class='text-muted small'>Schoenfeld residuals test. ",
-            "A significant p-value (p < 0.05) suggests the proportional hazards assumption may be violated.</p>")
-          if (requireNamespace("gt", quietly = TRUE)) {
-            diag_html <- paste0(diag_html, gt::as_raw_html(gt::gt(ph_df)))
-          } else {
-            diag_html <- paste0(diag_html, "<pre>",
-              paste(capture.output(print(ph_df, row.names = FALSE)), collapse = "\n"), "</pre>")
-          }
+            "A significant p-value (p < 0.05) suggests the proportional hazards assumption may be violated.</p>",
+            tbl_html)
         }, error = function(e) {
-          diag_html <- paste0(diag_html, "<p>Cox diagnostics error: ", conditionMessage(e), "</p>")
+          paste0("<p>Cox diagnostics error: ", conditionMessage(e), "</p>")
         })
+        diag_parts <- c(diag_parts, list(cox_html))
       }
 
-      if (nchar(diag_html) == 0) diag_html <- "<p class='text-muted'>No diagnostics to show. Enable VIF or fit a model with factor predictors for marginal means.</p>"
-      HTML(diag_html)
+      if (length(diag_parts) == 0) {
+        return(HTML("<p class='text-muted'>No diagnostics to show. Enable VIF or fit a model with factor predictors for marginal means.</p>"))
+      }
+      HTML(paste(diag_parts, collapse = ""))
     })
 
     # Diagnostics forest plot as a reactive (so we can reuse it for export)
