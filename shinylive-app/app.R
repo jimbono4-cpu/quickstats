@@ -809,7 +809,12 @@ model_server <- function(id, shared) {
         model_fit(mod)
 
         # Tidy results
-        tidy_df <- broom::tidy(mod, conf.int = TRUE)
+        if (input$model_type == "lmer") {
+          if (!requireNamespace("broom.mixed", quietly = TRUE)) stop("broom.mixed package not available")
+          tidy_df <- broom.mixed::tidy(mod, conf.int = TRUE, effects = "fixed")
+        } else {
+          tidy_df <- broom::tidy(mod, conf.int = TRUE)
+        }
 
         # Apply robust SEs if requested
         if (input$robust_se && input$model_type %in% c("lm", "glm")) {
@@ -1896,7 +1901,7 @@ results_server <- function(id, shared) {
       manifest$software <- list(
         r_version = R.version.string,
         packages = paste(
-          c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+          c("gt", "gtsummary", "ggplot2", "broom", "broom.mixed", "labelled",
             "survival", "sandwich", "lmtest", "car", "emmeans",
             "haven", "readxl", "writexl", "lme4",
             "gridExtra", "base64enc"),
@@ -2700,7 +2705,7 @@ server <- function(input, output, session) {
   # --- Package installation with progress ------------------------------------
   # Install packages in server so we can show progress to the user
   observe({
-    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "broom.mixed", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
               "haven", "readxl", "writexl", "lme4",
               "gridExtra", "base64enc")
