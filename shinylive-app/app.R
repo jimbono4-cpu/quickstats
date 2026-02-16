@@ -2612,8 +2612,15 @@ results_server <- function(id, shared) {
     # Download as Word (HTML with Word MIME type)
     observeEvent(input$download_word, {
       html_report <- generate_html_report()
+      # Wrap with Word-compatible XML namespace header
+      word_header <- paste0(
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office" ',
+        'xmlns:w="urn:schemas-microsoft-com:office:word" ',
+        'xmlns="http://www.w3.org/TR/REC-html40">',
+        '<head><meta charset="utf-8"></head><body>')
+      word_content <- paste0(word_header, html_report, '</body></html>')
       session$sendCustomMessage("downloadWordFile",
-        list(content = html_report, filename = "analysis_report.doc"))
+        list(content = word_content, filename = "analysis_report.doc"))
     })
   })
 }
@@ -2734,13 +2741,7 @@ ui <- fluidPage(
 
       // Download as Word (.doc) file
       Shiny.addCustomMessageHandler('downloadWordFile', function(msg) {
-        var header = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
-          'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
-          'xmlns="http://www.w3.org/TR/REC-html40">' +
-          '<head><meta charset="utf-8"></head><body>';
-        var footer = '</body></html>';
-        var content = header + msg.content + footer;
-        var blob = new Blob([content], {type: 'application/msword'});
+        var blob = new Blob([msg.content], {type: 'application/msword'});
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = msg.filename || 'report.doc';
