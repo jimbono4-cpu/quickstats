@@ -2717,24 +2717,32 @@ ui <- fluidPage(
 
       // Download report as PDF using html2pdf.js
       Shiny.addCustomMessageHandler('downloadPDF', function(msg) {
-        // Create a temporary container to render the HTML
-        var container = document.createElement('div');
-        container.innerHTML = msg.content;
-        container.style.position = 'fixed';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '210mm';
-        document.body.appendChild(container);
-        var opt = {
-          margin: 10,
-          filename: 'analysis_report.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(container).save().then(function() {
-          document.body.removeChild(container);
-        });
+        // Use an iframe so the full HTML (with styles) renders correctly
+        var iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+        var doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(msg.content);
+        doc.close();
+        // Wait for content to render, then generate PDF
+        setTimeout(function() {
+          var opt = {
+            margin: 10,
+            filename: 'analysis_report.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          html2pdf().set(opt).from(doc.body).save().then(function() {
+            document.body.removeChild(iframe);
+          });
+        }, 500);
       });
 
       // Download as plain text file
