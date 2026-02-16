@@ -640,7 +640,7 @@ model_ui <- function(id) {
             "Complete case analysis (listwise deletion) is used. ",
             "Observations with missing values in the outcome or any predictor variable are excluded from the model."
           ),
-          selectInput(ns("outcome"), "Outcome variable:", choices = NULL),
+          selectInput(ns("outcome"), "Outcome / event variable:", choices = NULL),
           selectInput(ns("model_type"), "Model type:", choices = c(
             "Linear regression" = "lm",
             "Logistic regression" = "glm",
@@ -652,8 +652,7 @@ model_ui <- function(id) {
           hr(),
           conditionalPanel(
             condition = paste0("input['", ns("model_type"), "'] == 'cox'"),
-            selectInput(ns("time_var"), "Time variable:", choices = NULL),
-            selectInput(ns("event_var"), "Event variable:", choices = NULL)
+            selectInput(ns("time_var"), "Time variable:", choices = NULL)
           ),
           conditionalPanel(
             condition = paste0("input['", ns("model_type"), "'] == 'lmer'"),
@@ -717,7 +716,6 @@ model_server <- function(id, shared) {
       updateSelectInput(session, "outcome", choices = vars)
       updateCheckboxGroupInput(session, "predictors", choices = vars)
       updateSelectInput(session, "time_var", choices = num_vars)
-      updateSelectInput(session, "event_var", choices = num_vars)
       updateSelectInput(session, "random_var", choices = vars)
       updateSelectInput(session, "cluster_var", choices = vars)
     })
@@ -782,17 +780,17 @@ model_server <- function(id, shared) {
             glm(as.formula(formula_str), data = df, family = binomial)
           },
           "cox" = {
-            req(input$time_var, input$event_var)
+            req(input$time_var)
             if (!requireNamespace("survival", quietly = TRUE)) stop("survival not available")
-            # Ensure time and event variables are numeric (not factor)
+            # Ensure time and event (outcome) variables are numeric (not factor)
             if (is.factor(df[[input$time_var]])) {
               df[[input$time_var]] <- as.numeric(as.character(df[[input$time_var]]))
             }
-            if (is.factor(df[[input$event_var]])) {
-              df[[input$event_var]] <- as.numeric(as.character(df[[input$event_var]]))
+            if (is.factor(df[[outcome]])) {
+              df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
             }
             surv_formula <- as.formula(paste(
-              "survival::Surv(", input$time_var, ",", input$event_var, ") ~",
+              "survival::Surv(", input$time_var, ",", outcome, ") ~",
               paste(preds, collapse = " + ")
             ))
             survival::coxph(surv_formula, data = df)
@@ -964,12 +962,12 @@ model_server <- function(id, shared) {
                 "</pre>")
             }
           }, error = function(e) {
-            diag_html <<- paste0(diag_html, "<p>VIF error: ", conditionMessage(e), "</p>")
+            diag_html <- paste0(diag_html, "<p>VIF error: ", conditionMessage(e), "</p>")
           })
         }
       }
 
-      # Estimated marginal means
+      # Estimated marginal means (lm/glm only)
       if (input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("emmeans", quietly = TRUE)) {
           tryCatch({
@@ -992,6 +990,45 @@ model_server <- function(id, shared) {
             }
           }, error = function(e) NULL)
         }
+      }
+
+      # Cox regression diagnostics
+      if (input$model_type == "cox") {
+        tryCatch({
+          # Concordance
+          gl <- summary(mod)
+          concordance <- if (!is.null(gl$concordance)) round(gl$concordance[1], 3) else NULL
+          diag_html <- paste0(diag_html,
+            "<h5>Cox Model Diagnostics</h5>")
+          if (!is.null(concordance)) {
+            diag_html <- paste0(diag_html,
+              "<p><strong>Concordance (C-statistic):</strong> ", concordance,
+              " <span class='text-muted small'>(0.5 = no discrimination, 1.0 = perfect)</span></p>")
+          }
+
+          # Proportional hazards test (Schoenfeld residuals)
+          ph_test <- survival::cox.zph(mod)
+          ph_df <- as.data.frame(ph_test$table)
+          ph_df$Variable <- rownames(ph_df)
+          ph_df <- ph_df[, c("Variable", "chisq", "df", "p"), drop = FALSE]
+          names(ph_df) <- c("Variable", "Chi-sq", "df", "p-value")
+          ph_df[["Chi-sq"]] <- round(ph_df[["Chi-sq"]], 3)
+          ph_df[["p-value"]] <- ifelse(ph_df[["p-value"]] < 0.001, "<0.001",
+                                       round(ph_df[["p-value"]], 4))
+
+          diag_html <- paste0(diag_html,
+            "<h5>Test of Proportional Hazards Assumption</h5>",
+            "<p class='text-muted small'>Schoenfeld residuals test. ",
+            "A significant p-value (p < 0.05) suggests the proportional hazards assumption may be violated.</p>")
+          if (requireNamespace("gt", quietly = TRUE)) {
+            diag_html <- paste0(diag_html, gt::as_raw_html(gt::gt(ph_df)))
+          } else {
+            diag_html <- paste0(diag_html, "<pre>",
+              paste(capture.output(print(ph_df, row.names = FALSE)), collapse = "\n"), "</pre>")
+          }
+        }, error = function(e) {
+          diag_html <- paste0(diag_html, "<p>Cox diagnostics error: ", conditionMessage(e), "</p>")
+        })
       }
 
       if (nchar(diag_html) == 0) diag_html <- "<p class='text-muted'>No diagnostics to show. Enable VIF or fit a model with factor predictors for marginal means.</p>"
@@ -1184,14 +1221,14 @@ model_server <- function(id, shared) {
         df <- shared$data
         if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
         time_var <- input$time_var
-        event_var <- input$event_var
+        outcome <- input$outcome
 
         # Ensure time and event are numeric
         if (is.factor(df[[time_var]])) df[[time_var]] <- as.numeric(as.character(df[[time_var]]))
-        if (is.factor(df[[event_var]])) df[[event_var]] <- as.numeric(as.character(df[[event_var]]))
+        if (is.factor(df[[outcome]])) df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
 
         # Build KM fit
-        km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", event_var, ") ~ ", km_var))
+        km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", outcome, ") ~ ", km_var))
         km_fit <- survival::survfit(km_formula, data = df)
 
         # Extract data for plotting
