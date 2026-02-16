@@ -2396,7 +2396,8 @@ results_server <- function(id, shared) {
         '<title>Statistical Analysis Report</title>',
         '<style>',
         '  body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;',
-        '         max-width: 900px; margin: 0 auto; padding: 30px; color: #333; }',
+        '         max-width: 900px; margin: 0 auto; padding: 30px; color: #333;',
+        '         font-size: 14px; line-height: 1.5; }',
         '  h1 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; }',
         '  h2 { color: #444; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }',
         '  table { border-collapse: collapse; width: 100%; margin: 15px 0; }',
@@ -2722,8 +2723,8 @@ ui <- fluidPage(
         iframe.style.position = 'fixed';
         iframe.style.left = '-9999px';
         iframe.style.top = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '297mm';
+        iframe.style.width = '800px';
+        iframe.style.height = '1200px';
         iframe.style.border = 'none';
         document.body.appendChild(iframe);
         var doc = iframe.contentDocument || iframe.contentWindow.document;
@@ -2733,11 +2734,12 @@ ui <- fluidPage(
         // Wait for content to render, then generate PDF
         setTimeout(function() {
           var opt = {
-            margin: 10,
+            margin: [15, 15, 15, 15],
             filename: 'analysis_report.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            image: { type: 'png', quality: 1.0 },
+            html2canvas: { scale: 4, useCORS: true, letterRendering: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
           };
           html2pdf().set(opt).from(doc.body).save().then(function() {
             document.body.removeChild(iframe);
