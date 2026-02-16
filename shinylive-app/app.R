@@ -1067,12 +1067,13 @@ model_server <- function(id, shared) {
 
       plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
 
+      miss_info <- model_missing_info()
+      n_diag <- if (!is.null(miss_info)) miss_info$n_used else "?"
+
       ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
         ggplot2::geom_point(size = 3, color = "#4e79a7") +
         ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
         ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
-        miss_info <- model_missing_info()
-        n_diag <- if (!is.null(miss_info)) miss_info$n_used else "?"
         ggplot2::labs(title = paste0("Forest Plot — All Predictors (N = ", n_diag, ")"),
                       x = x_label, y = "") +
         ggplot2::theme_minimal(base_size = 14)
