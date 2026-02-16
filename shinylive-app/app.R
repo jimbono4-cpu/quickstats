@@ -912,7 +912,8 @@ model_server <- function(id, shared) {
         }
 
         model_tidy(tidy_df)
-        shared$model_result <- list(fit = mod, tidy = tidy_df, type = input$model_type)
+        shared$model_result <- list(fit = mod, tidy = tidy_df, type = input$model_type,
+                                    is_binary_mixed = mixed_model_binary())
 
         # Calculate observations dropped due to missing data
         n_total <- nrow(df)
@@ -990,31 +991,50 @@ model_server <- function(id, shared) {
       if ("conf.high" %in% names(display_df))
         display_df$conf.high <- round(as.numeric(display_df$conf.high), 4)
 
+      # Build Table 2 title naming the estimate
+      estimate_desc <- switch(input$model_type,
+        "lm" = "Linear regression coefficients",
+        "glm" = "Odds ratios from logistic regression",
+        "cox" = "Hazard ratios from Cox proportional hazards regression",
+        "lmer" = if (mixed_model_binary()) "Odds ratios from mixed-effects logistic regression"
+                 else "Mixed-effects linear regression coefficients"
+      )
+      table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_analytical, ")")
+
+      # AIC / BIC model fit statistics
+      fit_stats_banner <- NULL
+      mod <- model_fit()
+      if (!is.null(mod)) {
+        fit_parts <- tryCatch({
+          parts <- list()
+          aic_val <- tryCatch(AIC(mod), error = function(e) NULL)
+          bic_val <- tryCatch(BIC(mod), error = function(e) NULL)
+          if (!is.null(aic_val) && is.finite(aic_val)) parts$AIC <- round(aic_val, 1)
+          if (!is.null(bic_val) && is.finite(bic_val)) parts$BIC <- round(bic_val, 1)
+          parts
+        }, error = function(e) list())
+        if (length(fit_parts) > 0) {
+          stats_text <- paste(names(fit_parts), "=", unlist(fit_parts), collapse = "    ")
+          fit_stats_banner <- div(style = "font-size: 13px; color: #555; margin-top: 8px; margin-bottom: 8px;",
+            tags$strong("Model fit: "), stats_text)
+        }
+      }
+
       if (requireNamespace("gt", quietly = TRUE)) {
         tryCatch({
-          # Build Table 2 title naming the estimate
-          estimate_desc <- switch(input$model_type,
-            "lm" = "Linear regression coefficients",
-            "glm" = "Odds ratios from logistic regression",
-            "cox" = "Hazard ratios from Cox proportional hazards regression",
-            "lmer" = if (mixed_model_binary()) "Odds ratios from mixed-effects logistic regression"
-                     else "Mixed-effects linear regression coefficients"
-          )
-          table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_analytical, ")")
-
           gt_tbl <- gt::gt(display_df) |>
             gt::tab_header(title = table2_title)
           # Wrap with id for clipboard
           table_html <- HTML(paste0('<div id="', ns("model_results_html"), '">',
                       gt::as_raw_html(gt_tbl), '</div>'))
-          tagList(missing_banner, icc_banner, table_html)
+          tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
         }, error = function(e) {
           table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-          tagList(missing_banner, icc_banner, table_html)
+          tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
         })
       } else {
         table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-        tagList(missing_banner, icc_banner, table_html)
+        tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
       }
     })
 
@@ -1655,94 +1675,6 @@ results_ui <- function(id) {
               tabPanel("Plots",
                 uiOutput(ns("show_plots"))
               ),
-              tabPanel("Methods & Results Draft",
-                h5("Automated Methods & Results Drafting"),
-                p(class = "text-muted small",
-                  "Generate a structured prompt for an LLM to draft publication-style",
-                  "Methods and Results sections. Complete the study information below,",
-                  "then click 'Generate Prompt'. Copy the prompt into ChatGPT, Claude,",
-                  "or another LLM."),
-                div(class = "privacy-banner", style = "margin: 10px 0;",
-                  "No individual-level data is included in the prompt.",
-                  "Only aggregate statistics and model results are used."),
-                hr(),
-                # --- Study Information Form ---
-                h5("Study Information"),
-                p(class = "text-muted small",
-                  "Provide information that cannot be inferred from the data alone."),
-                fluidRow(
-                  column(6,
-                    selectInput(ns("study_design"), "1. Study Design:",
-                      choices = c("(select)" = "",
-                        "Randomised controlled trial" = "Randomised controlled trial",
-                        "Cluster randomised trial" = "Cluster randomised trial",
-                        "Cohort study" = "Cohort study",
-                        "Cross-sectional study" = "Cross-sectional study",
-                        "Case-control study" = "Case-control study",
-                        "Interrupted time series" = "Interrupted time series",
-                        "Quasi-experimental study" = "Quasi-experimental study",
-                        "Other" = "Other")),
-                    conditionalPanel(
-                      condition = paste0("input['", ns("study_design"), "'] == 'Other'"),
-                      textInput(ns("study_design_other"), "Specify design:", placeholder = "e.g. Ecological study")
-                    )
-                  ),
-                  column(6,
-                    textAreaInput(ns("study_setting"), "2. Study Setting:",
-                      placeholder = "Country/region, healthcare/educational/community setting, time period of data collection",
-                      rows = 3)
-                  )
-                ),
-                fluidRow(
-                  column(6,
-                    textAreaInput(ns("participants"), "3. Participants:",
-                      placeholder = "Inclusion criteria, exclusion criteria, eligibility restrictions",
-                      rows = 3)
-                  ),
-                  column(6,
-                    textAreaInput(ns("timepoints"), "4. Timepoint Definitions:",
-                      placeholder = "Baseline definition, follow-up timepoints, primary analysis timepoint",
-                      rows = 3)
-                  )
-                ),
-                fluidRow(
-                  column(12,
-                    textAreaInput(ns("outcome_defs"), "5. Outcome Definitions:",
-                      placeholder = paste(
-                        "For each outcome, provide:",
-                        "- Outcome name (as used in manuscript)",
-                        "- Type (continuous, binary, count, time-to-event)",
-                        "- Measurement instrument or source",
-                        "- Direction of effect (higher = better/worse)",
-                        "- Primary vs secondary designation",
-                        sep = "\n"),
-                      rows = 4)
-                  )
-                ),
-                hr(),
-                fluidRow(
-                  column(6,
-                    actionButton(ns("generate_prompt"), "Generate LLM Prompt",
-                                 class = "btn-primary"),
-                    actionButton(ns("copy_prompt"), "Copy Prompt to Clipboard",
-                                 class = "btn-outline-secondary")
-                  ),
-                  column(6,
-                    p(class = "text-muted small", style = "margin-top: 8px;",
-                      "The prompt includes your study info + analysis manifest.",
-                      "Paste it into your preferred LLM for a Methods & Results draft.")
-                  )
-                ),
-                hr(),
-                h5("Analysis Manifest (auto-captured)"),
-                uiOutput(ns("analysis_manifest_display")),
-                hr(),
-                h5("Generated Prompt"),
-                tags$textarea(id = ns("prompt_text"), rows = 25,
-                  style = "width:100%; font-family:monospace; font-size:11px;",
-                  readonly = "readonly",
-                  "Complete the study information form above and click 'Generate LLM Prompt'.")
-              ),
               tabPanel("Export",
                 h5("Download Report as PDF"),
                 p("Generate a print-ready report containing all your results.",
@@ -2280,9 +2212,12 @@ results_server <- function(id, shared) {
 
     # --- HTML report for PDF export ---
     generate_html_report <- function() {
-      # Build Table 1 HTML
+      # Build Table 1 HTML with title
       table1_html <- ""
+      table1_title <- ""
       if (!is.null(shared$table1)) {
+        n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+        table1_title <- paste0("Table 1. Characteristics of participants (N = ", n_t1, ")")
         tryCatch({
           if (requireNamespace("gt", quietly = TRUE)) {
             gt_tbl <- gtsummary::as_gt(shared$table1)
@@ -2299,25 +2234,48 @@ results_server <- function(id, shared) {
         })
       }
 
-      # Build regression results HTML
+      # Build regression results HTML with title and AIC/BIC
       regression_html <- ""
+      table2_title <- ""
+      fit_stats_html <- ""
       if (!is.null(shared$model_result)) {
-        display_df <- shared$model_result$tidy
+        res <- shared$model_result
+        display_df <- res$tidy
         display_df$estimate <- round(display_df$estimate, 4)
         display_df$std.error <- round(display_df$std.error, 4)
         display_df$statistic <- round(display_df$statistic, 3)
         display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
                                      round(display_df$p.value, 4))
+
+        # Build Table 2 title matching Step 4
+        n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+        is_binary_mixed <- isTRUE(res$is_binary_mixed)
+        estimate_desc <- switch(res$type,
+          "lm" = "Linear regression coefficients",
+          "glm" = "Odds ratios from logistic regression",
+          "cox" = "Hazard ratios from Cox proportional hazards regression",
+          "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
+                   else "Mixed-effects linear regression coefficients",
+          res$type)
+        table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
+
+        # AIC/BIC
+        tryCatch({
+          aic_val <- tryCatch(round(AIC(res$fit), 1), error = function(e) NULL)
+          bic_val <- tryCatch(round(BIC(res$fit), 1), error = function(e) NULL)
+          parts <- c()
+          if (!is.null(aic_val) && is.finite(aic_val)) parts <- c(parts, paste0("AIC = ", aic_val))
+          if (!is.null(bic_val) && is.finite(bic_val)) parts <- c(parts, paste0("BIC = ", bic_val))
+          if (length(parts) > 0) {
+            fit_stats_html <- paste0('<p style="color:#555; font-size:0.9em;"><strong>Model fit:</strong> ',
+                                    paste(parts, collapse = " &nbsp;&nbsp; "), '</p>')
+          }
+        }, error = function(e) NULL)
+
         tryCatch({
           if (requireNamespace("gt", quietly = TRUE)) {
-            model_label <- switch(shared$model_result$type,
-              "lm" = "Linear Regression",
-              "glm" = "Logistic Regression",
-              "cox" = "Cox Proportional Hazards",
-              "lmer" = "Mixed Model",
-              shared$model_result$type)
             gt_tbl <- gt::gt(display_df) |>
-              gt::tab_header(title = paste("Regression Results -", model_label))
+              gt::tab_header(title = table2_title)
             regression_html <- gt::as_raw_html(gt_tbl)
           } else {
             regression_html <- paste0("<pre>",
@@ -2376,11 +2334,12 @@ results_server <- function(id, shared) {
       }
 
       if (nchar(table1_html) > 0) {
-        html <- paste0(html, '<h2>Table 1: Descriptive Statistics</h2>', table1_html)
+        html <- paste0(html, '<h2>', htmltools::htmlEscape(table1_title), '</h2>', table1_html)
       }
 
       if (nchar(regression_html) > 0) {
-        html <- paste0(html, '<h2>Regression Results</h2>', regression_html)
+        html <- paste0(html, '<h2>', htmltools::htmlEscape(table2_title), '</h2>',
+                        regression_html, fit_stats_html)
       }
 
       # Plots section
@@ -2458,13 +2417,26 @@ results_server <- function(id, shared) {
       }
 
       if (!is.null(shared$table1)) {
-        lines <- c(lines, "TABLE 1", "",
+        n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+        lines <- c(lines,
+          paste0("TABLE 1. CHARACTERISTICS OF PARTICIPANTS (N = ", n_t1, ")"), "",
           paste(capture.output(print(shared$table1)), collapse = "\n"), "")
       }
 
       if (!is.null(shared$model_result)) {
-        tidy_df <- shared$model_result$tidy
-        lines <- c(lines, paste("REGRESSION RESULTS -", shared$model_result$type), "",
+        res <- shared$model_result
+        tidy_df <- res$tidy
+        n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+        is_binary_mixed <- isTRUE(res$is_binary_mixed)
+        estimate_desc <- toupper(switch(res$type,
+          "lm" = "Linear regression coefficients",
+          "glm" = "Odds ratios from logistic regression",
+          "cox" = "Hazard ratios from Cox proportional hazards regression",
+          "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
+                   else "Mixed-effects linear regression coefficients",
+          res$type))
+        lines <- c(lines,
+          paste0("TABLE 2. ", estimate_desc, " (N = ", n_model, ")"), "",
           paste(capture.output(print(
             data.frame(
               Term = tidy_df$term,
@@ -2475,6 +2447,15 @@ results_server <- function(id, shared) {
               stringsAsFactors = FALSE
             ), row.names = FALSE
           )), collapse = "\n"), "")
+        # AIC/BIC
+        tryCatch({
+          aic_val <- tryCatch(round(AIC(res$fit), 1), error = function(e) NULL)
+          bic_val <- tryCatch(round(BIC(res$fit), 1), error = function(e) NULL)
+          parts <- c()
+          if (!is.null(aic_val) && is.finite(aic_val)) parts <- c(parts, paste0("AIC = ", aic_val))
+          if (!is.null(bic_val) && is.finite(bic_val)) parts <- c(parts, paste0("BIC = ", bic_val))
+          if (length(parts) > 0) lines <- c(lines, paste("Model fit:", paste(parts, collapse = "  ")), "")
+        }, error = function(e) NULL)
       }
 
       # Figures
