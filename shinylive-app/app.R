@@ -810,8 +810,21 @@ model_server <- function(id, shared) {
 
         # Tidy results
         if (input$model_type == "lmer") {
-          if (!requireNamespace("broom.mixed", quietly = TRUE)) stop("broom.mixed package not available")
-          tidy_df <- broom.mixed::tidy(mod, conf.int = TRUE, effects = "fixed")
+          # Manual extraction of fixed effects for lmer (broom.mixed may not be available in WebR)
+          coef_summary <- summary(mod)$coefficients
+          tidy_df <- data.frame(
+            term = rownames(coef_summary),
+            estimate = coef_summary[, "Estimate"],
+            std.error = coef_summary[, "Std. Error"],
+            statistic = coef_summary[, "t value"],
+            stringsAsFactors = FALSE
+          )
+          # Approximate p-values using normal distribution (lmer doesn't provide them by default)
+          tidy_df$p.value <- 2 * pnorm(abs(tidy_df$statistic), lower.tail = FALSE)
+          # Approximate confidence intervals
+          tidy_df$conf.low <- tidy_df$estimate - 1.96 * tidy_df$std.error
+          tidy_df$conf.high <- tidy_df$estimate + 1.96 * tidy_df$std.error
+          rownames(tidy_df) <- NULL
         } else {
           tidy_df <- broom::tidy(mod, conf.int = TRUE)
         }
@@ -1901,7 +1914,7 @@ results_server <- function(id, shared) {
       manifest$software <- list(
         r_version = R.version.string,
         packages = paste(
-          c("gt", "gtsummary", "ggplot2", "broom", "broom.mixed", "labelled",
+          c("gt", "gtsummary", "ggplot2", "broom", "labelled",
             "survival", "sandwich", "lmtest", "car", "emmeans",
             "haven", "readxl", "writexl", "lme4",
             "gridExtra", "base64enc"),
@@ -2705,7 +2718,7 @@ server <- function(input, output, session) {
   # --- Package installation with progress ------------------------------------
   # Install packages in server so we can show progress to the user
   observe({
-    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "broom.mixed", "labelled",
+    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
               "haven", "readxl", "writexl", "lme4",
               "gridExtra", "base64enc")
