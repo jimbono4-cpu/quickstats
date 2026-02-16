@@ -2714,17 +2714,29 @@ ui <- fluidPage(
         }
       });
 
-      // Download report as PDF via browser print dialog
+      // Download report as PDF using hidden iframe print
       Shiny.addCustomMessageHandler('downloadPDF', function(msg) {
-        var win = window.open('', '_blank');
-        if (!win) {
-          alert('Pop-up blocked. Please allow pop-ups for this site to download the PDF report.');
-          return;
-        }
-        win.document.write(msg.content);
-        win.document.close();
-        // Wait for content to render, then trigger print
-        setTimeout(function() { win.print(); }, 500);
+        // Create a hidden iframe to render and print
+        var iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+        var doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(msg.content);
+        doc.close();
+        // Wait for content to render, then trigger print (Save as PDF)
+        iframe.onload = function() {
+          setTimeout(function() {
+            iframe.contentWindow.print();
+            // Clean up after printing
+            setTimeout(function() { document.body.removeChild(iframe); }, 1000);
+          }, 300);
+        };
       });
 
       // Download as plain text file
