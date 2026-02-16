@@ -658,8 +658,9 @@ model_ui <- function(id) {
             condition = paste0("input['", ns("model_type"), "'] == 'lmer'"),
             selectInput(ns("random_var"), "Random effect (grouping):", choices = NULL),
             p(class = "text-muted small",
-              tags$span(class = "badge bg-warning", "Experimental"),
-              "Mixed models may be slow in WebR.")
+              "Automatically fits linear (continuous outcome) or logistic ",
+              "(binary outcome) mixed model based on the outcome variable. ",
+              "May be slow in WebR.")
           ),
           hr(),
           checkboxInput(ns("robust_se"), "Cluster-robust SEs (sandwich)", value = FALSE),
@@ -740,6 +741,8 @@ model_server <- function(id, shared) {
     model_fit <- reactiveVal(NULL)
     model_tidy <- reactiveVal(NULL)
     model_missing_info <- reactiveVal(NULL)
+    mixed_model_binary <- reactiveVal(FALSE)
+    mixed_model_icc <- reactiveVal(NULL)
 
     observeEvent(input$fit_model, {
       req(shared$data)
@@ -802,7 +805,24 @@ model_server <- function(id, shared) {
               outcome, "~", paste(preds, collapse = " + "),
               "+ (1 |", input$random_var, ")"
             ))
-            lme4::lmer(mixed_formula, data = df)
+            # Auto-detect binary vs continuous outcome
+            outcome_vals <- na.omit(df[[outcome]])
+            is_binary <- is.logical(outcome_vals) ||
+              (is.numeric(outcome_vals) && all(outcome_vals %in% c(0, 1))) ||
+              (is.factor(outcome_vals) && length(levels(outcome_vals)) == 2) ||
+              (is.character(outcome_vals) && length(unique(outcome_vals)) == 2)
+            mixed_model_binary(is_binary)
+            if (is_binary) {
+              # Convert to numeric 0/1 if needed
+              if (is.factor(df[[outcome]])) {
+                df[[outcome]] <- as.numeric(df[[outcome]]) - 1
+              } else if (is.character(df[[outcome]])) {
+                df[[outcome]] <- as.numeric(as.factor(df[[outcome]])) - 1
+              }
+              lme4::glmer(mixed_formula, data = df, family = binomial)
+            } else {
+              lme4::lmer(mixed_formula, data = df)
+            }
           }
         )
 
@@ -810,23 +830,60 @@ model_server <- function(id, shared) {
 
         # Tidy results
         if (input$model_type == "lmer") {
-          # Manual extraction of fixed effects for lmer (broom.mixed may not be available in WebR)
+          # Manual extraction of fixed effects (broom.mixed not available in WebR)
           coef_summary <- summary(mod)$coefficients
+          # glmer uses "z value", lmer uses "t value"
+          stat_col <- if ("z value" %in% colnames(coef_summary)) "z value" else "t value"
           tidy_df <- data.frame(
             term = rownames(coef_summary),
             estimate = coef_summary[, "Estimate"],
             std.error = coef_summary[, "Std. Error"],
-            statistic = coef_summary[, "t value"],
+            statistic = coef_summary[, stat_col],
             stringsAsFactors = FALSE
           )
-          # Approximate p-values using normal distribution (lmer doesn't provide them by default)
-          tidy_df$p.value <- 2 * pnorm(abs(tidy_df$statistic), lower.tail = FALSE)
-          # Approximate confidence intervals
+          # p-values: glmer provides them, lmer approximates via normal distribution
+          if ("Pr(>|z|)" %in% colnames(coef_summary)) {
+            tidy_df$p.value <- coef_summary[, "Pr(>|z|)"]
+          } else {
+            tidy_df$p.value <- 2 * pnorm(abs(tidy_df$statistic), lower.tail = FALSE)
+          }
+          # Confidence intervals
           tidy_df$conf.low <- tidy_df$estimate - 1.96 * tidy_df$std.error
           tidy_df$conf.high <- tidy_df$estimate + 1.96 * tidy_df$std.error
           rownames(tidy_df) <- NULL
+
+          # Calculate ICC with 95% CI
+          tryCatch({
+            vc <- as.data.frame(lme4::VarCorr(mod))
+            if (mixed_model_binary()) {
+              # For binary: ICC = sigma2_u / (sigma2_u + pi^2/3)
+              sigma2_u <- vc$vcov[1]
+              icc_val <- sigma2_u / (sigma2_u + (pi^2 / 3))
+            } else {
+              # For continuous: ICC = sigma2_u / (sigma2_u + sigma2_e)
+              sigma2_u <- vc$vcov[vc$grp != "Residual"][1]
+              sigma2_e <- vc$vcov[vc$grp == "Residual"][1]
+              icc_val <- sigma2_u / (sigma2_u + sigma2_e)
+            }
+            # Bootstrap-style approximate 95% CI using delta method
+            n_groups <- length(unique(na.omit(df[[input$random_var]])))
+            icc_se <- sqrt((2 * (1 - icc_val)^2 * (1 + (n_groups - 1) * icc_val)^2) /
+                           (n_groups * (n_groups - 1)))
+            icc_low <- max(0, icc_val - 1.96 * icc_se)
+            icc_high <- min(1, icc_val + 1.96 * icc_se)
+            mixed_model_icc(list(
+              icc = round(icc_val, 3),
+              ci_low = round(icc_low, 3),
+              ci_high = round(icc_high, 3),
+              group_var = input$random_var,
+              n_groups = n_groups
+            ))
+          }, error = function(e) {
+            mixed_model_icc(NULL)
+          })
         } else {
           tidy_df <- broom::tidy(mod, conf.int = TRUE)
+          mixed_model_icc(NULL)
         }
 
         # Apply robust SEs if requested
@@ -845,8 +902,10 @@ model_server <- function(id, shared) {
           }
         }
 
-        # Exponentiate for logistic/Cox
-        if (input$model_type %in% c("glm", "cox")) {
+        # Exponentiate for logistic/Cox/binary mixed model
+        is_exp <- input$model_type %in% c("glm", "cox") ||
+                  (input$model_type == "lmer" && mixed_model_binary())
+        if (is_exp) {
           tidy_df$OR_HR <- round(exp(tidy_df$estimate), 3)
           tidy_df$ci_lower <- round(exp(tidy_df$conf.low), 3)
           tidy_df$ci_upper <- round(exp(tidy_df$conf.high), 3)
@@ -903,6 +962,22 @@ model_server <- function(id, shared) {
       # Get analytical sample size for table title
       n_analytical <- if (!is.null(miss_info)) miss_info$n_used else "?"
 
+      # ICC banner for mixed models
+      icc_banner <- NULL
+      icc_info <- mixed_model_icc()
+      if (!is.null(icc_info) && input$model_type == "lmer") {
+        model_type_label <- if (mixed_model_binary()) "Binary" else "Linear"
+        icc_banner <- div(class = "alert alert-info", style = "font-size: 13px;",
+          tags$strong(paste0(model_type_label, " mixed model — ")),
+          tags$strong("ICC: "), paste0(icc_info$icc,
+            " (95% CI: ", icc_info$ci_low, " to ", icc_info$ci_high, ")"),
+          br(),
+          tags$span(class = "text-muted small",
+            paste0("Grouping variable: ", icc_info$group_var,
+                   " (", icc_info$n_groups, " groups). ",
+                   "ICC represents the proportion of total variance attributable to between-group differences.")))
+      }
+
       # Format table
       display_df <- tidy_df
       display_df$estimate <- round(display_df$estimate, 4)
@@ -922,7 +997,8 @@ model_server <- function(id, shared) {
             "lm" = "Linear regression coefficients",
             "glm" = "Odds ratios from logistic regression",
             "cox" = "Hazard ratios from Cox proportional hazards regression",
-            "lmer" = "Mixed model coefficients"
+            "lmer" = if (mixed_model_binary()) "Odds ratios from mixed-effects logistic regression"
+                     else "Mixed-effects linear regression coefficients"
           )
           table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_analytical, ")")
 
@@ -931,14 +1007,14 @@ model_server <- function(id, shared) {
           # Wrap with id for clipboard
           table_html <- HTML(paste0('<div id="', ns("model_results_html"), '">',
                       gt::as_raw_html(gt_tbl), '</div>'))
-          tagList(missing_banner, table_html)
+          tagList(missing_banner, icc_banner, table_html)
         }, error = function(e) {
           table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-          tagList(missing_banner, table_html)
+          tagList(missing_banner, icc_banner, table_html)
         })
       } else {
         table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-        tagList(missing_banner, table_html)
+        tagList(missing_banner, icc_banner, table_html)
       }
     })
 
@@ -1073,7 +1149,7 @@ model_server <- function(id, shared) {
         plot_df$est <- plot_df$OR_HR
         plot_df$lo <- plot_df$ci_lower
         plot_df$hi <- plot_df$ci_upper
-        x_label <- if (input$model_type == "glm") "Odds Ratio" else "Hazard Ratio"
+        x_label <- if (input$model_type %in% c("glm", "lmer")) "Odds Ratio" else "Hazard Ratio"
         ref_line <- 1
       } else {
         plot_df$est <- plot_df$estimate
@@ -1205,17 +1281,17 @@ model_server <- function(id, shared) {
               choices = terms_no_int, selected = terms_no_int)
           )
         )
-      } else if (mtype == "glm") {
+      } else if (mtype == "glm" || (mtype == "lmer" && mixed_model_binary())) {
         tidy_df <- model_tidy()
         if (is.null(tidy_df)) return(NULL)
         terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
         tagList(
-          p(strong("Forest Plot"), "— select terms to display:"),
+          p(strong("Forest Plot (Odds Ratios)"), "— select terms to display:"),
           checkboxGroupInput(ns("plot_terms"), NULL,
             choices = terms_no_int, selected = terms_no_int)
         )
       } else {
-        # For lm/lmer: exposure vs outcome plots — user picks predictors
+        # For lm/continuous lmer: exposure vs outcome plots — user picks predictors
         tagList(
           p(strong("Exposure vs Outcome Plots"), "— select predictors:"),
           checkboxGroupInput(ns("plot_vars"), NULL,
@@ -1282,7 +1358,7 @@ model_server <- function(id, shared) {
             plot.title = ggplot2::element_text(face = "bold"),
             legend.position = "bottom")
 
-      } else if (mtype %in% c("glm", "cox")) {
+      } else if (mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())) {
         # Forest plot of selected terms
         tidy_df <- model_tidy()
         if (is.null(tidy_df)) return(NULL)
