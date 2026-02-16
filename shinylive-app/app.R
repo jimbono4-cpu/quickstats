@@ -2633,6 +2633,7 @@ results_server <- function(id, shared) {
 ui <- fluidPage(
   theme = NULL,
   tags$head(
+    tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"),
     tags$style(HTML("
       .step-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -2714,29 +2715,26 @@ ui <- fluidPage(
         }
       });
 
-      // Download report as PDF using hidden iframe print
+      // Download report as PDF using html2pdf.js
       Shiny.addCustomMessageHandler('downloadPDF', function(msg) {
-        // Create a hidden iframe to render and print
-        var iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        var doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(msg.content);
-        doc.close();
-        // Wait for content to render, then trigger print (Save as PDF)
-        iframe.onload = function() {
-          setTimeout(function() {
-            iframe.contentWindow.print();
-            // Clean up after printing
-            setTimeout(function() { document.body.removeChild(iframe); }, 1000);
-          }, 300);
+        // Create a temporary container to render the HTML
+        var container = document.createElement('div');
+        container.innerHTML = msg.content;
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '210mm';
+        document.body.appendChild(container);
+        var opt = {
+          margin: 10,
+          filename: 'analysis_report.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
+        html2pdf().set(opt).from(container).save().then(function() {
+          document.body.removeChild(container);
+        });
       });
 
       // Download as plain text file
