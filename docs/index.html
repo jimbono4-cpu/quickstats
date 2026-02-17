@@ -5,12 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Statistical Analysis — Shinylive</title>
   <link rel="stylesheet" href="shinylive/shinylive.css" />
-  <script type="module" src="shinylive/shinylive.js"></script>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; }
+    #app { width: 100%; height: 100%; }
   </style>
+  <script type="module">
+    // Register service worker FIRST, wait for it to activate, then load the app
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.register("./shinylive-sw.js");
+      if (reg.installing) {
+        await new Promise(resolve => {
+          reg.installing.addEventListener("statechange", e => {
+            if (e.target.state === "activated") resolve();
+          });
+        });
+      }
+    }
+    const { runExportedApp } = await import("./shinylive/shinylive.js");
+    runExportedApp({ id: "app", appEngine: "r" });
+  </script>
 </head>
 <body>
+<div id="app"></div>
 <script type="shinylive-r">
 ## file: app.R
 # =============================================================================
