@@ -29,6 +29,36 @@ install_if_needed <- function(pkg_name) {
   }
 }
 
+# --- WebR-safe HTML table rendering ------------------------------------------
+
+#' Render a data.frame as a styled HTML table (no gt/gtsummary needed)
+df_to_html_table <- function(df, title = NULL, id = NULL,
+                              class = "table table-striped table-sm table-bordered") {
+  if (is.null(df) || nrow(df) == 0) return("<p class='text-muted'>No data to display.</p>")
+  # Build HTML
+  id_attr <- if (!is.null(id)) paste0(' id="', id, '"') else ""
+  html <- paste0('<div', id_attr, '>')
+  if (!is.null(title)) html <- paste0(html, '<h5>', htmltools::htmlEscape(title), '</h5>')
+  html <- paste0(html, '<table class="', class, '" style="width:100%;">')
+  # Header
+
+  html <- paste0(html, '<thead><tr>')
+  for (col in names(df)) html <- paste0(html, '<th>', htmltools::htmlEscape(col), '</th>')
+  html <- paste0(html, '</tr></thead><tbody>')
+  # Rows
+  for (i in seq_len(nrow(df))) {
+    html <- paste0(html, '<tr>')
+    for (j in seq_len(ncol(df))) {
+      val <- df[i, j]
+      if (is.numeric(val)) val <- round(val, 4)
+      html <- paste0(html, '<td>', htmltools::htmlEscape(as.character(val)), '</td>')
+    }
+    html <- paste0(html, '</tr>')
+  }
+  html <- paste0(html, '</tbody></table></div>')
+  html
+}
+
 # --- Helper functions ---------------------------------------------------------
 
 #' Detect variable types using heuristics
@@ -312,6 +342,7 @@ explore_server <- function(id, shared) {
 
     output$dist_plot <- renderPlot({
       req(shared$data, input$plot_var)
+      install_if_needed("ggplot2")
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       df <- shared$data
       v <- input$plot_var
@@ -477,10 +508,6 @@ table1_server <- function(id, shared) {
 
     observeEvent(input$generate, {
       req(shared$data)
-      if (!requireNamespace("gtsummary", quietly = TRUE)) {
-        showNotification("gtsummary package not available", type = "error")
-        return()
-      }
 
       selected_vars <- input$vars
       if (length(selected_vars) == 0) {
@@ -506,37 +533,25 @@ table1_server <- function(id, shared) {
       }
 
       tryCatch({
-        # Build statistic list for continuous variables
         vt <- shared$var_types
-        stat_list <- list()
-        normal_vars <- c()     # track which vars are normal
-        nonnormal_vars <- c()  # track which vars are non-normal
         analysis_vars <- setdiff(cols, by_var)
+        normal_vars <- c()
+        nonnormal_vars <- c()
 
+        # Classify normality
         for (v in analysis_vars) {
           is_cat <- is.factor(df_sub[[v]]) || is.character(df_sub[[v]]) ||
                     (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
           if (is_cat) next
-
-          # Default: Mean (SD) for all continuous variables
-          stat_list[[v]] <- "{mean} ({sd})"
           normal_vars <- c(normal_vars, v)
-
-          # If normality testing enabled, check and switch non-normal to Median (IQR)
           if (isTRUE(input$test_normality)) {
             x <- na.omit(df_sub[[v]])
             if (length(x) >= 3) {
               is_normal <- tryCatch({
-                # Shapiro-Wilk limited to n=5000; subsample if larger
-                if (length(x) > 5000) {
-                  set.seed(42)
-                  x <- sample(x, 5000)
-                }
+                if (length(x) > 5000) { set.seed(42); x <- sample(x, 5000) }
                 shapiro.test(x)$p.value > 0.05
-              }, error = function(e) TRUE)  # assume normal on error
-
+              }, error = function(e) TRUE)
               if (!is_normal) {
-                stat_list[[v]] <- "{median} ({p25}, {p75})"
                 normal_vars <- setdiff(normal_vars, v)
                 nonnormal_vars <- c(nonnormal_vars, v)
               }
@@ -544,48 +559,108 @@ table1_server <- function(id, shared) {
           }
         }
 
-        tbl <- gtsummary::tbl_summary(
-          df_sub,
-          by = by_var,
-          missing = "ifany",
-          statistic = if (length(stat_list) > 0) stat_list else NULL,
-          digits = list(gtsummary::all_continuous() ~ 2,
-                        gtsummary::all_categorical() ~ c(0, 1))
-        )
-        # Add stat label column (e.g. "n (%)", "Median (IQR)", "Mean (SD)")
-        tbl <- gtsummary::add_stat_label(tbl, location = "column")
-        if (input$add_p && !is.null(by_var)) {
-          # Build test map aligned with normality decisions
-          # Determine number of stratification groups
-          n_groups <- length(unique(na.omit(df_sub[[by_var]])))
+        # --- Build Table 1 using base R (WebR-safe, no gtsummary) ---
+        groups <- if (!is.null(by_var)) levels(df_sub[[by_var]]) else NULL
+        n_total <- nrow(df_sub)
+        rows <- list()
 
-          test_list <- list()
-          # Normal continuous: parametric tests
-          for (v in normal_vars) {
-            test_list[[v]] <- if (n_groups == 2) "t.test" else "aov"
-          }
-          # Non-normal continuous: non-parametric tests
-          for (v in nonnormal_vars) {
-            test_list[[v]] <- if (n_groups == 2) "wilcox.test" else "kruskal.test"
-          }
-          # Categorical/binary: use gtsummary defaults (chisq.test / fisher.test)
-
-          if (length(test_list) > 0) {
-            tbl <- gtsummary::add_p(tbl, test = test_list)
+        for (v in analysis_vars) {
+          is_cat <- is.factor(df_sub[[v]]) || is.character(df_sub[[v]]) ||
+                    (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
+          if (is_cat) {
+            # Categorical variable
+            lvls <- if (is.factor(df_sub[[v]])) levels(df_sub[[v]]) else sort(unique(na.omit(df_sub[[v]])))
+            # Header row for this variable
+            row <- list(Variable = paste0("**", v, "**"), Statistic = "n (%)")
+            if (!is.null(groups)) {
+              for (g in groups) row[[paste0(by_var, ": ", g)]] <- ""
+            }
+            row[["Overall"]] <- ""
+            rows <- c(rows, list(row))
+            # Level rows
+            for (lv in lvls) {
+              row <- list(Variable = paste0("    ", lv), Statistic = "")
+              if (!is.null(groups)) {
+                for (g in groups) {
+                  sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
+                  n_lv <- sum(sub[[v]] == lv, na.rm = TRUE)
+                  pct <- round(100 * n_lv / nrow(sub), 1)
+                  row[[paste0(by_var, ": ", g)]] <- paste0(n_lv, " (", pct, "%)")
+                }
+              }
+              n_lv_all <- sum(df_sub[[v]] == lv, na.rm = TRUE)
+              pct_all <- round(100 * n_lv_all / n_total, 1)
+              row[["Overall"]] <- paste0(n_lv_all, " (", pct_all, "%)")
+              rows <- c(rows, list(row))
+            }
+            # p-value row for categorical
+            if (input$add_p && !is.null(by_var)) {
+              p_val <- tryCatch({
+                tbl_test <- table(df_sub[[v]], df_sub[[by_var]])
+                chisq.test(tbl_test)$p.value
+              }, error = function(e) NA)
+              rows[[length(rows)]][["p-value"]] <- if (!is.na(p_val)) {
+                if (p_val < 0.001) "<0.001" else as.character(round(p_val, 3))
+              } else ""
+            }
           } else {
-            tbl <- gtsummary::add_p(tbl)
+            # Continuous variable
+            is_nonnormal <- v %in% nonnormal_vars
+            stat_label <- if (is_nonnormal) "Median (IQR)" else "Mean (SD)"
+            row <- list(Variable = paste0("**", v, "**"), Statistic = stat_label)
+            fmt_stat <- function(x) {
+              x <- na.omit(x)
+              if (is_nonnormal) {
+                paste0(round(median(x), 2), " (", round(quantile(x, 0.25), 2), ", ", round(quantile(x, 0.75), 2), ")")
+              } else {
+                paste0(round(mean(x), 2), " (", round(sd(x), 2), ")")
+              }
+            }
+            if (!is.null(groups)) {
+              for (g in groups) {
+                sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
+                row[[paste0(by_var, ": ", g)]] <- fmt_stat(sub[[v]])
+              }
+            }
+            row[["Overall"]] <- fmt_stat(df_sub[[v]])
+            # p-value
+            if (input$add_p && !is.null(by_var)) {
+              p_val <- tryCatch({
+                n_groups <- length(groups)
+                if (is_nonnormal) {
+                  if (n_groups == 2) wilcox.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  else kruskal.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                } else {
+                  if (n_groups == 2) t.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  else summary(aov(df_sub[[v]] ~ df_sub[[by_var]]))[[1]][["Pr(>F)"]][1]
+                }
+              }, error = function(e) NA)
+              row[["p-value"]] <- if (!is.na(p_val)) {
+                if (p_val < 0.001) "<0.001" else as.character(round(p_val, 3))
+              } else ""
+            }
+            rows <- c(rows, list(row))
           }
         }
-        if (input$add_overall && !is.null(by_var)) {
-          tbl <- gtsummary::add_overall(tbl)
-        }
-        # Add title with sample size
-        n_table1 <- nrow(df_sub)
-        tbl <- gtsummary::modify_caption(tbl,
-          paste0("**Table 1. Characteristics of participants (N = ", n_table1, ")**"))
 
-        table1_obj(tbl)
-        shared$table1 <- tbl
+        # Build data frame from rows
+        all_cols <- unique(unlist(lapply(rows, names)))
+        tbl_df <- do.call(rbind, lapply(rows, function(r) {
+          vals <- sapply(all_cols, function(c) if (!is.null(r[[c]])) as.character(r[[c]]) else "")
+          as.data.frame(as.list(vals), stringsAsFactors = FALSE)
+        }))
+        names(tbl_df) <- all_cols
+        # Remove Overall column if no stratification
+        if (is.null(by_var)) {
+          tbl_df <- tbl_df[, names(tbl_df) != "Overall", drop = FALSE]
+        }
+        # Remove p-value column if not requested
+        if (!input$add_p || is.null(by_var)) {
+          tbl_df <- tbl_df[, names(tbl_df) != "p-value", drop = FALSE]
+        }
+
+        table1_obj(tbl_df)
+        shared$table1 <- tbl_df
         showNotification("Table 1 generated", type = "message")
       }, error = function(e) {
         showNotification(paste("Error:", conditionMessage(e)), type = "error")
@@ -597,18 +672,11 @@ table1_server <- function(id, shared) {
       if (is.null(tbl)) {
         return(p(class = "text-muted", "Configure settings and click 'Generate Table 1'"))
       }
-      tryCatch({
-        if (requireNamespace("gt", quietly = TRUE)) {
-          gt_tbl <- gtsummary::as_gt(tbl)
-          html_str <- gt::as_raw_html(gt_tbl)
-          # Wrap in a div with an id for clipboard copy
-          HTML(paste0('<div id="', ns("table1_html"), '">', html_str, '</div>'))
-        } else {
-          HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
-        }
-      }, error = function(e) {
-        HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
-      })
+      n_total <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+      title <- paste0("Table 1. Characteristics of participants (N = ", n_total, ")")
+      # Render bold markdown in Variable column
+      tbl$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl$Variable)
+      HTML(df_to_html_table(tbl, title = title, id = ns("table1_html")))
     })
 
     observeEvent(input$export_html, {
@@ -1020,22 +1088,9 @@ model_server <- function(id, shared) {
         }
       }
 
-      if (requireNamespace("gt", quietly = TRUE)) {
-        tryCatch({
-          gt_tbl <- gt::gt(display_df) |>
-            gt::tab_header(title = table2_title)
-          # Wrap with id for clipboard
-          table_html <- HTML(paste0('<div id="', ns("model_results_html"), '">',
-                      gt::as_raw_html(gt_tbl), '</div>'))
-          tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
-        }, error = function(e) {
-          table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-          tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
-        })
-      } else {
-        table_html <- HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-        tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
-      }
+      table_html <- HTML(df_to_html_table(display_df, title = table2_title,
+                                          id = ns("model_results_html")))
+      tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
     })
 
     # Copy regression results to clipboard
@@ -1065,11 +1120,7 @@ model_server <- function(id, shared) {
               Flag = ifelse(vif_vals > 10, "HIGH", ifelse(vif_vals > 5, "Moderate", "OK")),
               stringsAsFactors = FALSE
             )
-            tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
-              gt::as_raw_html(gt::gt(vif_df))
-            } else {
-              paste0("<pre>", paste(capture.output(print(vif_df, row.names = FALSE)), collapse = "\n"), "</pre>")
-            }
+            tbl_html <- df_to_html_table(vif_df)
             paste0("<h5>Variance Inflation Factors (VIF)</h5>",
               "<p class='text-muted small'>VIF > 5: moderate concern. VIF > 10: serious multicollinearity.</p>",
               tbl_html)
@@ -1092,11 +1143,7 @@ model_server <- function(id, shared) {
               emm <- emmeans::emmeans(mod, factor_preds[1])
               emm_df <- as.data.frame(summary(emm))
               emm_df[] <- lapply(emm_df, function(x) if (is.numeric(x)) round(x, 3) else x)
-              tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
-                gt::as_raw_html(gt::gt(emm_df))
-              } else {
-                paste0("<pre>", paste(capture.output(print(emm_df)), collapse = "\n"), "</pre>")
-              }
+              tbl_html <- df_to_html_table(emm_df)
               paste0("<h5>Estimated Marginal Means: ", factor_preds[1], "</h5>", tbl_html)
             } else NULL
           }, error = function(e) NULL)
@@ -1134,11 +1181,7 @@ model_server <- function(id, shared) {
           ph_df[["p-value"]] <- ifelse(ph_df[["p-value"]] < 0.001, "<0.001",
                                        round(ph_df[["p-value"]], 4))
 
-          tbl_html <- if (requireNamespace("gt", quietly = TRUE)) {
-            gt::as_raw_html(gt::gt(ph_df))
-          } else {
-            paste0("<pre>", paste(capture.output(print(ph_df, row.names = FALSE)), collapse = "\n"), "</pre>")
-          }
+          tbl_html <- df_to_html_table(ph_df)
           paste0(parts,
             "<h5>Test of Proportional Hazards Assumption</h5>",
             "<p class='text-muted small'>Schoenfeld residuals test. ",
@@ -1462,13 +1505,18 @@ model_server <- function(id, shared) {
         } else {
           # Use patchwork-like manual arrangement with gridExtra if available,
           # otherwise just show the first plot
-          tryCatch({
-            do.call(gridExtra::grid.arrange,
-                    c(plot_list, ncol = min(2, length(plot_list))))
-          }, error = function(e) {
-            # Fallback: just first plot if gridExtra not available
+          if (length(plot_list) == 1) {
             plot_list[[1]]
-          })
+          } else {
+            tryCatch({
+              install_if_needed("gridExtra")
+              do.call(gridExtra::grid.arrange,
+                      c(plot_list, ncol = min(2, length(plot_list))))
+            }, error = function(e) {
+              # Fallback: just first plot
+              plot_list[[1]]
+            })
+          }
         }
       }
     })
@@ -1591,10 +1639,14 @@ model_server <- function(id, shared) {
                 ggplot2::theme_minimal(base_size = 12)
             }
           })
-          tryCatch(
-            do.call(gridExtra::grid.arrange, c(plot_list, ncol = min(2, length(plot_list)))),
-            error = function(e) print(plot_list[[1]])
-          )
+          if (length(plot_list) == 1) {
+            print(plot_list[[1]])
+          } else {
+            tryCatch({
+              install_if_needed("gridExtra")
+              do.call(gridExtra::grid.arrange, c(plot_list, ncol = min(2, length(plot_list))))
+            }, error = function(e) print(plot_list[[1]]))
+          }
         }
         grDevices::dev.off()
         raw <- readBin(tmp, "raw", file.info(tmp)$size)
@@ -1702,16 +1754,12 @@ results_server <- function(id, shared) {
     output$show_table1 <- renderUI({
       tbl <- shared$table1
       if (is.null(tbl)) return(p(class = "text-muted", "No Table 1 generated yet. Go to Step 3."))
-      tryCatch({
-        if (requireNamespace("gt", quietly = TRUE)) {
-          gt_tbl <- gtsummary::as_gt(tbl)
-          HTML(gt::as_raw_html(gt_tbl))
-        } else {
-          HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
-        }
-      }, error = function(e) {
+      if (is.data.frame(tbl)) {
+        tbl$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl$Variable)
+        HTML(df_to_html_table(tbl, title = "Table 1. Descriptive Statistics"))
+      } else {
         HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
-      })
+      }
     })
 
     output$show_plots <- renderUI({
@@ -1780,17 +1828,7 @@ results_server <- function(id, shared) {
       display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
                                    round(display_df$p.value, 4))
 
-      tryCatch({
-        if (requireNamespace("gt", quietly = TRUE)) {
-          gt_tbl <- gt::gt(display_df) |>
-            gt::tab_header(title = "Regression Results")
-          HTML(gt::as_raw_html(gt_tbl))
-        } else {
-          HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-        }
-      }, error = function(e) {
-        HTML(paste("<pre>", paste(capture.output(print(display_df)), collapse = "\n"), "</pre>"))
-      })
+      HTML(df_to_html_table(display_df, title = "Regression Results"))
     })
 
     # --- Analysis manifest builder ---
@@ -1819,28 +1857,20 @@ results_server <- function(id, shared) {
       }
 
       # Table 1 — extract as formatted text for LLM consumption
-      if (!is.null(shared$table1)) {
-        t1_text <- tryCatch({
-          # Try to get a tibble/data.frame from gtsummary
-          t1_df <- gtsummary::as_tibble(shared$table1, col_labels = TRUE)
-          # Format as aligned text table
-          col_widths <- sapply(names(t1_df), function(cn) {
-            max(nchar(cn), max(nchar(as.character(t1_df[[cn]])), na.rm = TRUE), na.rm = TRUE)
-          })
-          header <- paste(mapply(function(nm, w) formatC(nm, width = w, flag = "-"),
-                                 names(t1_df), col_widths), collapse = " | ")
-          sep_line <- paste(sapply(col_widths, function(w) paste(rep("-", w), collapse = "")),
-                            collapse = "-+-")
-          rows <- apply(t1_df, 1, function(row) {
-            paste(mapply(function(val, w) formatC(as.character(val), width = w, flag = "-"),
-                         row, col_widths), collapse = " | ")
-          })
-          paste(c(header, sep_line, rows), collapse = "\n")
-        }, error = function(e) {
-          # Fallback: capture.output print
-          paste(capture.output(print(shared$table1)), collapse = "\n")
+      if (!is.null(shared$table1) && is.data.frame(shared$table1)) {
+        t1_df <- shared$table1
+        col_widths <- sapply(names(t1_df), function(cn) {
+          max(nchar(cn), max(nchar(as.character(t1_df[[cn]])), na.rm = TRUE), na.rm = TRUE)
         })
-        manifest$table1 <- t1_text
+        header <- paste(mapply(function(nm, w) formatC(nm, width = w, flag = "-"),
+                               names(t1_df), col_widths), collapse = " | ")
+        sep_line <- paste(sapply(col_widths, function(w) paste(rep("-", w), collapse = "")),
+                          collapse = "-+-")
+        rows <- apply(t1_df, 1, function(row) {
+          paste(mapply(function(val, w) formatC(as.character(val), width = w, flag = "-"),
+                       row, col_widths), collapse = " | ")
+        })
+        manifest$table1 <- paste(c(header, sep_line, rows), collapse = "\n")
       }
 
       # Regression model
@@ -2306,20 +2336,15 @@ results_server <- function(id, shared) {
       if (!is.null(shared$table1)) {
         n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
         table1_title <- paste0("Table 1. Characteristics of participants (N = ", n_t1, ")")
-        tryCatch({
-          if (requireNamespace("gt", quietly = TRUE)) {
-            gt_tbl <- gtsummary::as_gt(shared$table1)
-            table1_html <- gt::as_raw_html(gt_tbl)
-          } else {
-            table1_html <- paste0("<pre>",
-              paste(capture.output(print(shared$table1)), collapse = "\n"),
-              "</pre>")
-          }
-        }, error = function(e) {
-          table1_html <<- paste0("<pre>",
+        if (is.data.frame(shared$table1)) {
+          tbl_copy <- shared$table1
+          tbl_copy$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl_copy$Variable)
+          table1_html <- df_to_html_table(tbl_copy, title = table1_title)
+        } else {
+          table1_html <- paste0("<pre>",
             paste(capture.output(print(shared$table1)), collapse = "\n"),
             "</pre>")
-        })
+        }
       }
 
       # Build regression results HTML with title and AIC/BIC
@@ -2360,21 +2385,7 @@ results_server <- function(id, shared) {
           }
         }, error = function(e) NULL)
 
-        tryCatch({
-          if (requireNamespace("gt", quietly = TRUE)) {
-            gt_tbl <- gt::gt(display_df) |>
-              gt::tab_header(title = table2_title)
-            regression_html <- gt::as_raw_html(gt_tbl)
-          } else {
-            regression_html <- paste0("<pre>",
-              paste(capture.output(print(display_df)), collapse = "\n"),
-              "</pre>")
-          }
-        }, error = function(e) {
-          regression_html <<- paste0("<pre>",
-            paste(capture.output(print(display_df)), collapse = "\n"),
-            "</pre>")
-        })
+        regression_html <- df_to_html_table(display_df, title = table2_title)
       }
 
       # Data summary section
