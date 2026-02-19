@@ -365,8 +365,9 @@ explore_server <- function(id, shared) {
 
     output$dist_plot <- renderPlot({
       req(shared$data, input$plot_var)
+      install_if_needed("ggplot2")
       if (!requireNamespace("ggplot2", quietly = TRUE)) {
-        plot.new(); text(0.5, 0.5, "ggplot2 not yet loaded. Please wait.", cex = 1.2)
+        plot.new(); text(0.5, 0.5, "ggplot2 not available.", cex = 1.2)
         return()
       }
       df <- shared$data
@@ -675,8 +676,8 @@ table1_server <- function(id, shared) {
           as.data.frame(as.list(vals), stringsAsFactors = FALSE)
         }))
         names(tbl_df) <- all_cols
-        # Remove Overall column if no stratification
-        if (is.null(by_var)) {
+        # Remove Overall column only if stratified and user didn't request it
+        if (!is.null(by_var) && !input$add_overall) {
           tbl_df <- tbl_df[, names(tbl_df) != "Overall", drop = FALSE]
         }
         # Remove p-value column if not requested
@@ -1233,6 +1234,7 @@ model_server <- function(id, shared) {
     diagnostics_forest_plot <- reactive({
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
+      install_if_needed("ggplot2")
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
 
       plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
@@ -1414,6 +1416,7 @@ model_server <- function(id, shared) {
     current_plot <- reactive({
       mod <- model_fit()
       if (is.null(mod)) return(NULL)
+      install_if_needed("ggplot2")
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       mtype <- input$model_type
 
