@@ -31,31 +31,54 @@ install_if_needed <- function(pkg_name) {
 
 # --- WebR-safe HTML table rendering ------------------------------------------
 
-#' Render a data.frame as a styled HTML table (no gt/gtsummary needed)
-df_to_html_table <- function(df, title = NULL, id = NULL,
-                              class = "table table-striped table-sm table-bordered") {
+#' Render a data.frame as a publication-quality HTML table
+df_to_html_table <- function(df, title = NULL, id = NULL, footnote = NULL) {
   if (is.null(df) || nrow(df) == 0) return("<p class='text-muted'>No data to display.</p>")
-  # Build HTML
   id_attr <- if (!is.null(id)) paste0(' id="', id, '"') else ""
   html <- paste0('<div', id_attr, '>')
-  if (!is.null(title)) html <- paste0(html, '<h5>', htmltools::htmlEscape(title), '</h5>')
-  html <- paste0(html, '<table class="', class, '" style="width:100%;">')
-  # Header
-
-  html <- paste0(html, '<thead><tr>')
-  for (col in names(df)) html <- paste0(html, '<th>', htmltools::htmlEscape(col), '</th>')
+  if (!is.null(title)) {
+    html <- paste0(html,
+      '<p style="font-weight:bold; font-size:14px; margin-bottom:4px;">',
+      htmltools::htmlEscape(title), '</p>')
+  }
+  html <- paste0(html,
+    '<table style="width:100%; border-collapse:collapse; font-size:13px; ',
+    'font-family: \'Segoe UI\', Tahoma, Geneva, Verdana, sans-serif; margin-bottom:8px;">',
+    '<thead><tr style="border-top:2px solid #333; border-bottom:1px solid #333;">')
+  for (col in names(df)) {
+    html <- paste0(html,
+      '<th style="padding:6px 10px; text-align:left; font-weight:bold;">',
+      htmltools::htmlEscape(col), '</th>')
+  }
   html <- paste0(html, '</tr></thead><tbody>')
-  # Rows
   for (i in seq_len(nrow(df))) {
-    html <- paste0(html, '<tr>')
+    # Bottom border on last row
+    bdr <- if (i == nrow(df)) ' style="border-bottom:2px solid #333;"' else ""
+    html <- paste0(html, '<tr', bdr, '>')
     for (j in seq_len(ncol(df))) {
       val <- df[i, j]
       if (is.numeric(val)) val <- round(val, 4)
-      html <- paste0(html, '<td>', htmltools::htmlEscape(as.character(val)), '</td>')
+      cell_text <- htmltools::htmlEscape(as.character(val))
+      # Convert **bold** markdown to HTML bold (after escaping, safe)
+      cell_text <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", cell_text)
+      # Indent lines starting with spaces
+      indent <- ""
+      if (grepl("^\\s{2,}", as.character(val))) {
+        indent <- "padding-left:20px;"
+      }
+      html <- paste0(html,
+        '<td style="padding:4px 10px; border-bottom:1px solid #eee;', indent, '">',
+        cell_text, '</td>')
     }
     html <- paste0(html, '</tr>')
   }
-  html <- paste0(html, '</tbody></table></div>')
+  html <- paste0(html, '</tbody></table>')
+  if (!is.null(footnote)) {
+    html <- paste0(html,
+      '<p style="font-size:11px; color:#666; margin-top:2px; font-style:italic;">',
+      htmltools::htmlEscape(footnote), '</p>')
+  }
+  html <- paste0(html, '</div>')
   html
 }
 
@@ -342,8 +365,10 @@ explore_server <- function(id, shared) {
 
     output$dist_plot <- renderPlot({
       req(shared$data, input$plot_var)
-      install_if_needed("ggplot2")
-      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        plot.new(); text(0.5, 0.5, "ggplot2 not yet loaded. Please wait.", cex = 1.2)
+        return()
+      }
       df <- shared$data
       v <- input$plot_var
       if (!(v %in% names(df))) return(NULL)
@@ -674,8 +699,6 @@ table1_server <- function(id, shared) {
       }
       n_total <- if (!is.null(shared$data)) nrow(shared$data) else "?"
       title <- paste0("Table 1. Characteristics of participants (N = ", n_total, ")")
-      # Render bold markdown in Variable column
-      tbl$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl$Variable)
       HTML(df_to_html_table(tbl, title = title, id = ns("table1_html")))
     })
 
@@ -1047,17 +1070,24 @@ model_server <- function(id, shared) {
                    "ICC represents the proportion of total variance attributable to between-group differences.")))
       }
 
-      # Format table
+      # Format table — unname all numeric columns to avoid c(name=value) display
       display_df <- tidy_df
-      display_df$estimate <- round(display_df$estimate, 4)
-      display_df$std.error <- round(display_df$std.error, 4)
-      display_df$statistic <- round(display_df$statistic, 3)
-      display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
-                                   round(display_df$p.value, 4))
+      display_df$term <- as.character(display_df$term)
+      display_df$estimate <- unname(round(as.numeric(display_df$estimate), 2))
+      display_df$std.error <- unname(round(as.numeric(display_df$std.error), 2))
+      display_df$statistic <- unname(round(as.numeric(display_df$statistic), 2))
+      display_df$p.value <- ifelse(as.numeric(display_df$p.value) < 0.001, "<0.001",
+                                   as.character(round(as.numeric(display_df$p.value), 3)))
       if ("conf.low" %in% names(display_df))
-        display_df$conf.low <- round(as.numeric(display_df$conf.low), 4)
+        display_df$conf.low <- unname(round(as.numeric(display_df$conf.low), 2))
       if ("conf.high" %in% names(display_df))
-        display_df$conf.high <- round(as.numeric(display_df$conf.high), 4)
+        display_df$conf.high <- unname(round(as.numeric(display_df$conf.high), 2))
+      if ("OR_HR" %in% names(display_df))
+        display_df$OR_HR <- unname(round(as.numeric(display_df$OR_HR), 2))
+      if ("ci_lower" %in% names(display_df))
+        display_df$ci_lower <- unname(round(as.numeric(display_df$ci_lower), 2))
+      if ("ci_upper" %in% names(display_df))
+        display_df$ci_upper <- unname(round(as.numeric(display_df$ci_upper), 2))
 
       # Build Table 2 title naming the estimate
       estimate_desc <- switch(input$model_type,
@@ -1354,14 +1384,28 @@ model_server <- function(id, shared) {
             choices = terms_no_int, selected = terms_no_int)
         )
       } else {
-        # For lm/continuous lmer: exposure vs outcome plots — user picks predictors
+        # For lm/continuous lmer: forest plot or exposure vs outcome plots
+        tidy_df <- model_tidy()
+        terms_no_int <- if (!is.null(tidy_df)) tidy_df$term[tidy_df$term != "(Intercept)"] else preds
         tagList(
-          p(strong("Exposure vs Outcome Plots"), "— select predictors:"),
-          checkboxGroupInput(ns("plot_vars"), NULL,
-            choices = preds, selected = preds[1]),
-          p(class = "text-muted small",
-            "Numeric predictors: scatter + regression line. ",
-            "Categorical predictors: box plot.")
+          selectInput(ns("plot_type_lm"), "Plot type:",
+            choices = c("Forest Plot (Coefficients)" = "forest",
+                        "Exposure vs Outcome" = "scatter"),
+            selected = "forest"),
+          conditionalPanel(
+            condition = paste0("input['", ns("plot_type_lm"), "'] == 'forest'"),
+            p(strong("Forest Plot"), "— select terms to display:"),
+            checkboxGroupInput(ns("plot_terms_lm"), NULL,
+              choices = terms_no_int, selected = terms_no_int)
+          ),
+          conditionalPanel(
+            condition = paste0("input['", ns("plot_type_lm"), "'] == 'scatter'"),
+            p(strong("Exposure vs Outcome"), "— select predictors:"),
+            checkboxGroupInput(ns("plot_vars"), NULL,
+              choices = preds, selected = preds[1]),
+            p(class = "text-muted small",
+              "Numeric: scatter + regression line. Categorical: box plot.")
+          )
         )
       }
     })
@@ -1457,7 +1501,43 @@ model_server <- function(id, shared) {
             panel.grid.major.y = ggplot2::element_blank(),
             plot.title = ggplot2::element_text(face = "bold"))
       } else {
-        # lm or lmer: scatter/box plots for selected predictors
+        # lm or continuous lmer: forest plot or scatter/box plots
+        plot_type_lm <- input$plot_type_lm
+        if (!is.null(plot_type_lm) && plot_type_lm == "forest") {
+          # Forest plot of coefficients for lm/lmer
+          tidy_df <- model_tidy()
+          if (is.null(tidy_df)) return(NULL)
+          sel <- input$plot_terms_lm
+          if (is.null(sel) || length(sel) == 0) return(NULL)
+
+          plot_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+          if (nrow(plot_df) == 0) return(NULL)
+
+          plot_df$est <- unname(as.numeric(plot_df$estimate))
+          plot_df$lo <- unname(as.numeric(plot_df$conf.low))
+          plot_df$hi <- unname(as.numeric(plot_df$conf.high))
+          plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
+          plot_df$label <- paste0(round(plot_df$est, 2), " [",
+                                  round(plot_df$lo, 2), ", ", round(plot_df$hi, 2), "]")
+
+          return(
+            ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+              ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+              ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
+              ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
+                                      height = 0.25, color = "#4e79a7", linewidth = 0.8) +
+              ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
+              ggplot2::labs(
+                title = paste0("Forest Plot: Coefficients (N = ", n_analytical, ")"),
+                x = "Coefficient (95% CI)", y = "") +
+              ggplot2::theme_minimal(base_size = 13) +
+              ggplot2::theme(
+                panel.grid.major.y = ggplot2::element_blank(),
+                plot.title = ggplot2::element_text(face = "bold"))
+          )
+        }
+
+        # Scatter/box plots
         sel <- input$plot_vars
         if (is.null(sel) || length(sel) == 0) return(NULL)
         outcome <- input$outcome
@@ -1560,10 +1640,35 @@ model_server <- function(id, shared) {
           }
         }
       } else {
-        # lm or lmer: exposure vs outcome plots
+        # lm or lmer: forest plot or exposure vs outcome plots
+        plot_type_lm <- input$plot_type_lm
+        if (!is.null(plot_type_lm) && plot_type_lm == "forest") {
+          sel <- input$plot_terms_lm
+          if (!is.null(sel) && length(sel) > 0) {
+            tidy_df <- model_tidy()
+            if (!is.null(tidy_df)) {
+              sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+              desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
+                r <- sub_df[i, ]
+                paste0(r$term, ": ", round(as.numeric(r$estimate), 2),
+                       " [", round(as.numeric(r$conf.low), 2), ", ",
+                       round(as.numeric(r$conf.high), 2), "]",
+                       ", p=", if (as.numeric(r$p.value) < 0.001) "<0.001"
+                              else round(as.numeric(r$p.value), 3))
+              })
+              plot_descriptions <- list(list(
+                type = "forest_plot",
+                title = "Forest Plot: Coefficients",
+                description = paste0("Forest plot showing regression coefficients",
+                  " with 95% CIs for: ", paste(sel, collapse = ", "), "."),
+                details = paste(desc_items, collapse = "; ")
+              ))
+            }
+          }
+        }
         sel <- input$plot_vars
         outcome <- input$outcome
-        if (!is.null(sel) && length(sel) > 0 && !is.null(outcome)) {
+        if (length(plot_descriptions) == 0 && !is.null(sel) && length(sel) > 0 && !is.null(outcome)) {
           vt <- shared$var_types
 
           # For multiple variables: create ONE faceted plot description
@@ -1949,7 +2054,7 @@ results_server <- function(id, shared) {
       manifest$software <- list(
         r_version = R.version.string,
         packages = paste(
-          c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+          c("ggplot2", "broom", "labelled",
             "survival", "sandwich", "lmtest", "car", "emmeans",
             "haven", "readxl", "writexl", "lme4",
             "gridExtra", "base64enc"),
@@ -2952,7 +3057,7 @@ server <- function(input, output, session) {
   # --- Package installation with progress ------------------------------------
   # Install packages in server so we can show progress to the user
   observe({
-    pkgs <- c("gt", "gtsummary", "ggplot2", "broom", "labelled",
+    pkgs <- c("ggplot2", "broom", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
               "haven", "readxl", "writexl", "lme4",
               "gridExtra", "base64enc")
