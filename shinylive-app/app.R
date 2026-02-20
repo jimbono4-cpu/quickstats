@@ -23,6 +23,10 @@ install_if_needed <- function(pkg_name) {
       } else {
         install.packages(pkg_name, repos = "https://cloud.r-project.org", quiet = TRUE)
       }
+      # Force-load the namespace after installing
+      suppressPackageStartupMessages(
+        library(pkg_name, character.only = TRUE, quietly = TRUE)
+      )
     }, error = function(e) {
       tryCatch(install.packages(pkg_name, quiet = TRUE), error = function(e2) NULL)
     })
@@ -1095,6 +1099,42 @@ model_server <- function(id, shared) {
       if ("ci_upper" %in% names(display_df))
         display_df$ci_upper <- unname(round(as.numeric(display_df$ci_upper), 2))
 
+      # Rename confidence interval columns for publication
+      if ("conf.low" %in% names(display_df)) {
+        names(display_df)[names(display_df) == "conf.low"] <- "CI Lower"
+        names(display_df)[names(display_df) == "conf.high"] <- "CI Upper"
+      }
+      if ("ci_lower" %in% names(display_df)) {
+        names(display_df)[names(display_df) == "ci_lower"] <- "CI Lower"
+        names(display_df)[names(display_df) == "ci_upper"] <- "CI Upper"
+      }
+      if ("OR_HR" %in% names(display_df)) {
+        or_label <- if (input$model_type == "cox") "HR" else "OR"
+        names(display_df)[names(display_df) == "OR_HR"] <- or_label
+      }
+      names(display_df)[names(display_df) == "term"] <- "Term"
+      names(display_df)[names(display_df) == "estimate"] <- "Estimate"
+      names(display_df)[names(display_df) == "std.error"] <- "Std. Error"
+      names(display_df)[names(display_df) == "statistic"] <- "Statistic"
+      names(display_df)[names(display_df) == "p.value"] <- "P-value"
+
+      # Reorder columns: Term, Estimate, CI, then P-value last
+      is_exp <- input$model_type %in% c("glm", "cox") ||
+                (input$model_type == "lmer" && mixed_model_binary())
+      if (is_exp) {
+        or_label <- if (input$model_type == "cox") "HR" else "OR"
+        desired_order <- c("Term", "Estimate", "Std. Error", or_label,
+                           "CI Lower", "CI Upper", "Statistic", "P-value")
+      } else {
+        desired_order <- c("Term", "Estimate", "Std. Error",
+                           "CI Lower", "CI Upper", "Statistic", "P-value")
+      }
+      # Keep only columns that exist, in the desired order
+      desired_order <- desired_order[desired_order %in% names(display_df)]
+      # Add any remaining columns not in the desired order
+      remaining <- setdiff(names(display_df), desired_order)
+      display_df <- display_df[, c(desired_order, remaining), drop = FALSE]
+
       # Build Table 2 title naming the estimate
       estimate_desc <- switch(input$model_type,
         "lm" = "Linear regression coefficients",
@@ -1363,59 +1403,53 @@ model_server <- function(id, shared) {
       outcome <- input$outcome
       if (length(preds) == 0) return(NULL)
 
-      # For Cox: KM curve + forest plot; logistic: forest plot
+      tidy_df <- model_tidy()
+      if (is.null(tidy_df)) return(NULL)
+      terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
+
+      # Forest plot term selection (all model types)
+      forest_section <- tagList(
+        p(strong("Forest Plot"), "— select terms to display:"),
+        checkboxGroupInput(ns("plot_terms"), NULL,
+          choices = terms_no_int, selected = terms_no_int)
+      )
+
       if (mtype == "cox") {
-        tidy_df <- model_tidy()
-        if (is.null(tidy_df)) return(NULL)
-        terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
-        # Identify categorical predictors for KM stratification
         km_choices <- intersect(preds, names(shared$data))
         tagList(
-          selectInput(ns("plot_type_cox"), "Plot type:",
-            choices = c("Kaplan-Meier Survival Curve" = "km",
-                        "Forest Plot" = "forest"),
-            selected = "km"),
+          forest_section,
+          hr(),
+          p(strong("Additional: Kaplan-Meier Survival Curve")),
+          selectInput(ns("plot_type_cox"), "Show KM curve:",
+            choices = c("Forest Plot only" = "forest",
+                        "Also show KM curve" = "km"),
+            selected = "forest"),
           conditionalPanel(
             condition = paste0("input['", ns("plot_type_cox"), "'] == 'km'"),
             selectInput(ns("km_strata"), "Stratify survival curve by:",
               choices = km_choices, selected = km_choices[1])
-          ),
-          conditionalPanel(
-            condition = paste0("input['", ns("plot_type_cox"), "'] == 'forest'"),
-            p(strong("Forest Plot"), "— select terms to display:"),
-            checkboxGroupInput(ns("plot_terms"), NULL,
-              choices = terms_no_int, selected = terms_no_int)
           )
         )
       } else if (mtype == "glm" || (mtype == "lmer" && mixed_model_binary())) {
-        tidy_df <- model_tidy()
-        if (is.null(tidy_df)) return(NULL)
-        terms_no_int <- tidy_df$term[tidy_df$term != "(Intercept)"]
+        or_label <- if (mtype == "glm") "Odds Ratios" else "Odds Ratios (mixed-effects)"
         tagList(
-          p(strong("Forest Plot (Odds Ratios)"), "— select terms to display:"),
-          checkboxGroupInput(ns("plot_terms"), NULL,
-            choices = terms_no_int, selected = terms_no_int)
+          p(tags$em(paste0("Showing: ", or_label))),
+          forest_section
         )
       } else {
-        # For lm/continuous lmer: forest plot or exposure vs outcome plots
-        tidy_df <- model_tidy()
-        terms_no_int <- if (!is.null(tidy_df)) tidy_df$term[tidy_df$term != "(Intercept)"] else preds
+        # lm / continuous lmer
         tagList(
-          selectInput(ns("plot_type_lm"), "Plot type:",
-            choices = c("Forest Plot (Coefficients)" = "forest",
-                        "Exposure vs Outcome" = "scatter"),
+          forest_section,
+          hr(),
+          selectInput(ns("plot_type_lm"), "Additional plots:",
+            choices = c("Forest Plot only" = "forest",
+                        "Also show Exposure vs Outcome" = "scatter"),
             selected = "forest"),
-          conditionalPanel(
-            condition = paste0("input['", ns("plot_type_lm"), "'] == 'forest'"),
-            p(strong("Forest Plot"), "— select terms to display:"),
-            checkboxGroupInput(ns("plot_terms_lm"), NULL,
-              choices = terms_no_int, selected = terms_no_int)
-          ),
           conditionalPanel(
             condition = paste0("input['", ns("plot_type_lm"), "'] == 'scatter'"),
             p(strong("Exposure vs Outcome"), "— select predictors:"),
             checkboxGroupInput(ns("plot_vars"), NULL,
-              choices = preds, selected = preds[1]),
+              choices = preds, selected = preds),
             p(class = "text-muted small",
               "Numeric: scatter + regression line. Categorical: box plot.")
           )
@@ -1438,183 +1472,166 @@ model_server <- function(id, shared) {
       miss_info <- model_missing_info()
       n_analytical <- if (!is.null(miss_info)) miss_info$n_used else nobs(mod)
 
-      if (mtype == "cox" && !is.null(input$plot_type_cox) && input$plot_type_cox == "km") {
-        # Kaplan-Meier survival curve
-        if (!requireNamespace("survival", quietly = TRUE)) return(NULL)
-        km_var <- input$km_strata
-        if (is.null(km_var) || !(km_var %in% names(shared$data))) return(NULL)
+      tidy_df <- model_tidy()
+      if (is.null(tidy_df)) return(NULL)
 
-        df <- shared$data
-        if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
-        time_var <- input$time_var
-        outcome <- input$outcome
+      # Build plot list — always start with forest plot
+      plot_list <- list()
 
-        # Ensure time and event are numeric
-        if (is.factor(df[[time_var]])) df[[time_var]] <- as.numeric(as.character(df[[time_var]]))
-        if (is.factor(df[[outcome]])) df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+      # --- Forest plot (all model types) ---
+      # Use user-selected terms if available, otherwise all non-intercept terms
+      all_terms <- tidy_df$term[tidy_df$term != "(Intercept)"]
 
-        # Build KM fit
-        km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", outcome, ") ~ ", km_var))
-        km_fit <- survival::survfit(km_formula, data = df)
-
-        # Extract data for plotting
-        km_data <- data.frame(
-          time = km_fit$time,
-          surv = km_fit$surv,
-          upper = km_fit$upper,
-          lower = km_fit$lower,
-          strata = rep(names(km_fit$strata), km_fit$strata)
-        )
-        # Clean strata labels
-        km_data$strata <- gsub(paste0("^", km_var, "="), "", km_data$strata)
-
-        ggplot2::ggplot(km_data, ggplot2::aes(x = time, y = surv, color = strata)) +
-          ggplot2::geom_step(linewidth = 0.9) +
-          ggplot2::geom_step(ggplot2::aes(y = lower), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
-          ggplot2::geom_step(ggplot2::aes(y = upper), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
-          ggplot2::labs(
-            title = paste0("Kaplan-Meier Survival Curve by ", km_var, " (N = ", n_analytical, ")"),
-            x = "Time", y = "Survival Probability",
-            color = km_var, fill = km_var) +
-          ggplot2::scale_y_continuous(limits = c(0, 1)) +
-          ggplot2::theme_minimal(base_size = 13) +
-          ggplot2::theme(
-            plot.title = ggplot2::element_text(face = "bold"),
-            legend.position = "bottom")
-
-      } else if (mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())) {
-        # Forest plot of selected terms
-        tidy_df <- model_tidy()
-        if (is.null(tidy_df)) return(NULL)
-        sel <- input$plot_terms
-        if (is.null(sel) || length(sel) == 0) return(NULL)
-
+      is_exp <- mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())
+      if (is_exp) {
+        # Forest plot with OR/HR (exponentiated)
+        sel <- if (!is.null(input$plot_terms) && length(input$plot_terms) > 0) {
+          input$plot_terms
+        } else {
+          all_terms
+        }
         plot_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
-        if (nrow(plot_df) == 0) return(NULL)
-
-        plot_df$est <- plot_df$OR_HR
-        plot_df$lo <- plot_df$ci_lower
-        plot_df$hi <- plot_df$ci_upper
-        est_label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
-        x_label <- paste0(est_label, " (95% CI)")
-
-        plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
-
-        p_sig <- ifelse(as.numeric(gsub("<", "", plot_df$p.value)) < 0.05, "p < 0.05", "n.s.")
-        plot_df$label <- paste0(round(plot_df$est, 2), " [",
-                                round(plot_df$lo, 2), "-", round(plot_df$hi, 2), "]")
-
-        ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
-          ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
-          ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
-          ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
-                                  height = 0.25, color = "#4e79a7", linewidth = 0.8) +
-          ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
-          ggplot2::labs(
-            title = paste0("Forest Plot: ", est_label, " (N = ", n_analytical, ")"),
-            x = x_label, y = "") +
-          ggplot2::theme_minimal(base_size = 13) +
-          ggplot2::theme(
-            panel.grid.major.y = ggplot2::element_blank(),
-            plot.title = ggplot2::element_text(face = "bold"))
+        if (nrow(plot_df) > 0) {
+          plot_df$est <- as.numeric(plot_df$OR_HR)
+          plot_df$lo <- as.numeric(plot_df$ci_lower)
+          plot_df$hi <- as.numeric(plot_df$ci_upper)
+          est_label <- if (mtype == "cox") "Hazard Ratios" else "Odds Ratios"
+          x_label <- paste0(est_label, " (95% CI)")
+          plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
+          plot_df$label <- paste0(round(plot_df$est, 2), " [",
+                                  round(plot_df$lo, 2), "-", round(plot_df$hi, 2), "]")
+          forest_p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+            ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
+            ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
+            ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
+                                    height = 0.25, color = "#4e79a7", linewidth = 0.8) +
+            ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
+            ggplot2::labs(
+              title = paste0("Forest Plot: ", est_label, " (N = ", n_analytical, ")"),
+              x = x_label, y = "") +
+            ggplot2::theme_minimal(base_size = 13) +
+            ggplot2::theme(
+              panel.grid.major.y = ggplot2::element_blank(),
+              plot.title = ggplot2::element_text(face = "bold"))
+          plot_list <- c(plot_list, list(forest_p))
+        }
       } else {
-        # lm or continuous lmer: forest plot or scatter/box plots
-        plot_type_lm <- input$plot_type_lm
-        if (!is.null(plot_type_lm) && plot_type_lm == "forest") {
-          # Forest plot of coefficients for lm/lmer
-          tidy_df <- model_tidy()
-          if (is.null(tidy_df)) return(NULL)
-          sel <- input$plot_terms_lm
-          if (is.null(sel) || length(sel) == 0) return(NULL)
-
-          plot_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
-          if (nrow(plot_df) == 0) return(NULL)
-
+        # Forest plot with coefficients (lm, continuous lmer)
+        sel <- if (!is.null(input$plot_terms) && length(input$plot_terms) > 0) {
+          input$plot_terms
+        } else {
+          all_terms
+        }
+        plot_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+        if (nrow(plot_df) > 0) {
           plot_df$est <- unname(as.numeric(plot_df$estimate))
           plot_df$lo <- unname(as.numeric(plot_df$conf.low))
           plot_df$hi <- unname(as.numeric(plot_df$conf.high))
           plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
           plot_df$label <- paste0(round(plot_df$est, 2), " [",
                                   round(plot_df$lo, 2), ", ", round(plot_df$hi, 2), "]")
-
-          return(
-            ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
-              ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
-              ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
-              ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
-                                      height = 0.25, color = "#4e79a7", linewidth = 0.8) +
-              ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
-              ggplot2::labs(
-                title = paste0("Forest Plot: Coefficients (N = ", n_analytical, ")"),
-                x = "Coefficient (95% CI)", y = "") +
-              ggplot2::theme_minimal(base_size = 13) +
-              ggplot2::theme(
-                panel.grid.major.y = ggplot2::element_blank(),
-                plot.title = ggplot2::element_text(face = "bold"))
-          )
+          forest_p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+            ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+            ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
+            ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
+                                    height = 0.25, color = "#4e79a7", linewidth = 0.8) +
+            ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
+            ggplot2::labs(
+              title = paste0("Forest Plot: Coefficients (N = ", n_analytical, ")"),
+              x = "Coefficient (95% CI)", y = "") +
+            ggplot2::theme_minimal(base_size = 13) +
+            ggplot2::theme(
+              panel.grid.major.y = ggplot2::element_blank(),
+              plot.title = ggplot2::element_text(face = "bold"))
+          plot_list <- c(plot_list, list(forest_p))
         }
+      }
 
-        # Scatter/box plots
+      # --- KM survival curve (Cox only, if selected) ---
+      if (mtype == "cox" && !is.null(input$plot_type_cox) && input$plot_type_cox == "km") {
+        if (requireNamespace("survival", quietly = TRUE)) {
+          km_var <- input$km_strata
+          if (!is.null(km_var) && km_var %in% names(shared$data)) {
+            km_p <- tryCatch({
+              df <- shared$data
+              if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
+              time_var <- input$time_var
+              outcome <- input$outcome
+              if (is.factor(df[[time_var]])) df[[time_var]] <- as.numeric(as.character(df[[time_var]]))
+              if (is.factor(df[[outcome]])) df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+              km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", outcome, ") ~ ", km_var))
+              km_fit <- survival::survfit(km_formula, data = df)
+              km_data <- data.frame(
+                time = km_fit$time, surv = km_fit$surv,
+                upper = km_fit$upper, lower = km_fit$lower,
+                strata = rep(names(km_fit$strata), km_fit$strata)
+              )
+              km_data$strata <- gsub(paste0("^", km_var, "="), "", km_data$strata)
+              ggplot2::ggplot(km_data, ggplot2::aes(x = time, y = surv, color = strata)) +
+                ggplot2::geom_step(linewidth = 0.9) +
+                ggplot2::geom_step(ggplot2::aes(y = lower), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
+                ggplot2::geom_step(ggplot2::aes(y = upper), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
+                ggplot2::labs(
+                  title = paste0("Kaplan-Meier Survival Curve by ", km_var, " (N = ", n_analytical, ")"),
+                  x = "Time", y = "Survival Probability",
+                  color = km_var, fill = km_var) +
+                ggplot2::scale_y_continuous(limits = c(0, 1)) +
+                ggplot2::theme_minimal(base_size = 13) +
+                ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "bottom")
+            }, error = function(e) NULL)
+            if (!is.null(km_p)) plot_list <- c(plot_list, list(km_p))
+          }
+        }
+      }
+
+      # --- Exposure vs outcome plots (lm/lmer scatter option) ---
+      if (mtype %in% c("lm", "lmer") && !is.null(input$plot_type_lm) && input$plot_type_lm == "scatter") {
         sel <- input$plot_vars
-        if (is.null(sel) || length(sel) == 0) return(NULL)
-        outcome <- input$outcome
-        df <- shared$data
-        if (is.null(df)) return(NULL)
-
-        # Prepare data
-        if (!is.null(shared$var_types)) {
-          df <- prepare_model_data(df, shared$var_types)
-        }
-
-        # Build a list of plots, one per selected predictor
-        plot_list <- lapply(sel, function(v) {
-          vt <- shared$var_types
-          is_cat <- (!is.null(vt) && v %in% vt$variable &&
-                     vt$type[vt$variable == v] == "categorical") ||
-                    is.factor(df[[v]]) || is.character(df[[v]])
-
-          if (is_cat) {
-            # Box plot
-            ggplot2::ggplot(df, ggplot2::aes(x = factor(.data[[v]]), y = .data[[outcome]])) +
-              ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5, outlier.size = 1) +
-              ggplot2::stat_summary(fun = mean, geom = "point", shape = 18,
-                                   size = 3, color = "#e15759") +
-              ggplot2::labs(title = paste0(outcome, " by ", v, " (N = ", n_analytical, ")"),
-                           x = v, y = outcome) +
-              ggplot2::theme_minimal(base_size = 12) +
-              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
-          } else {
-            # Scatter plot with regression line
-            ggplot2::ggplot(df, ggplot2::aes(x = .data[[v]], y = .data[[outcome]])) +
-              ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
-              ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759",
-                                  fill = "#e15759", alpha = 0.15) +
-              ggplot2::labs(title = paste0(outcome, " vs ", v, " (N = ", n_analytical, ")"),
-                           x = v, y = outcome) +
-              ggplot2::theme_minimal(base_size = 12) +
-              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
+        if (!is.null(sel) && length(sel) > 0) {
+          outcome <- input$outcome
+          df <- shared$data
+          if (!is.null(df) && !is.null(shared$var_types)) {
+            df <- prepare_model_data(df, shared$var_types)
           }
-        })
-
-        # Arrange in a grid
-        if (length(plot_list) == 1) {
-          plot_list[[1]]
-        } else {
-          # Use patchwork-like manual arrangement with gridExtra if available,
-          # otherwise just show the first plot
-          if (length(plot_list) == 1) {
-            plot_list[[1]]
-          } else {
-            tryCatch({
-              install_if_needed("gridExtra")
-              do.call(gridExtra::grid.arrange,
-                      c(plot_list, ncol = min(2, length(plot_list))))
-            }, error = function(e) {
-              # Fallback: just first plot
-              plot_list[[1]]
+          if (!is.null(df)) {
+            scatter_plots <- lapply(sel, function(v) {
+              vt <- shared$var_types
+              is_cat <- (!is.null(vt) && v %in% vt$variable &&
+                         vt$type[vt$variable == v] == "categorical") ||
+                        is.factor(df[[v]]) || is.character(df[[v]])
+              if (is_cat) {
+                ggplot2::ggplot(df, ggplot2::aes(x = factor(.data[[v]]), y = .data[[outcome]])) +
+                  ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5, outlier.size = 1) +
+                  ggplot2::stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "#e15759") +
+                  ggplot2::labs(title = paste0(outcome, " by ", v), x = v, y = outcome) +
+                  ggplot2::theme_minimal(base_size = 12) +
+                  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
+              } else {
+                ggplot2::ggplot(df, ggplot2::aes(x = .data[[v]], y = .data[[outcome]])) +
+                  ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
+                  ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759", fill = "#e15759", alpha = 0.15) +
+                  ggplot2::labs(title = paste0(outcome, " vs ", v), x = v, y = outcome) +
+                  ggplot2::theme_minimal(base_size = 12) +
+                  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 11))
+              }
             })
+            plot_list <- c(plot_list, scatter_plots)
           }
         }
+      }
+
+      # Return: if no plots, return NULL
+      if (length(plot_list) == 0) return(NULL)
+
+      # Arrange all plots in a faceted grid
+      if (length(plot_list) == 1) {
+        plot_list[[1]]
+      } else {
+        tryCatch({
+          install_if_needed("gridExtra")
+          do.call(gridExtra::grid.arrange,
+                  c(plot_list, ncol = min(2, length(plot_list))))
+        }, error = function(e) plot_list[[1]])
       }
     })
 
@@ -1634,93 +1651,76 @@ model_server <- function(id, shared) {
       # Build descriptions of what was plotted
       plot_descriptions <- list()
 
-      if (mtype %in% c("glm", "cox")) {
-        sel <- input$plot_terms
-        if (!is.null(sel) && length(sel) > 0) {
-          label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
-          tidy_df <- model_tidy()
-          if (!is.null(tidy_df)) {
-            sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+      # Forest plot description (all model types)
+      is_exp <- mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())
+      sel <- input$plot_terms
+      tidy_df <- model_tidy()
+      # Fallback: use all non-intercept terms if checkboxes not yet available
+      if ((is.null(sel) || length(sel) == 0) && !is.null(tidy_df)) {
+        sel <- tidy_df$term[tidy_df$term != "(Intercept)"]
+      }
+      if (!is.null(sel) && length(sel) > 0 && !is.null(tidy_df)) {
+        sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
+        if (nrow(sub_df) > 0) {
+          if (is_exp) {
+            label <- if (mtype == "cox") "Hazard Ratios" else "Odds Ratios"
             desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
               r <- sub_df[i, ]
-              paste0(r$term, ": ", round(r$OR_HR, 2),
-                     " [", round(r$ci_lower, 2), "-", round(r$ci_upper, 2), "]",
-                     ", p=", if (r$p.value < 0.001) "<0.001" else round(r$p.value, 3))
+              paste0(r$term, ": ", round(as.numeric(r$OR_HR), 2),
+                     " [", round(as.numeric(r$ci_lower), 2), "-",
+                     round(as.numeric(r$ci_upper), 2), "]",
+                     ", p=", if (as.numeric(r$p.value) < 0.001) "<0.001"
+                            else round(as.numeric(r$p.value), 3))
             })
-            plot_descriptions <- list(list(
-              type = "forest_plot",
-              title = paste("Forest Plot:", label),
-              description = paste0("Forest plot showing ", label,
-                " with 95% CIs for: ", paste(sel, collapse = ", "), "."),
-              details = paste(desc_items, collapse = "; ")
-            ))
-          }
-        }
-      } else {
-        # lm or lmer: forest plot or exposure vs outcome plots
-        plot_type_lm <- input$plot_type_lm
-        if (!is.null(plot_type_lm) && plot_type_lm == "forest") {
-          sel <- input$plot_terms_lm
-          if (!is.null(sel) && length(sel) > 0) {
-            tidy_df <- model_tidy()
-            if (!is.null(tidy_df)) {
-              sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
-              desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
-                r <- sub_df[i, ]
-                paste0(r$term, ": ", round(as.numeric(r$estimate), 2),
-                       " [", round(as.numeric(r$conf.low), 2), ", ",
-                       round(as.numeric(r$conf.high), 2), "]",
-                       ", p=", if (as.numeric(r$p.value) < 0.001) "<0.001"
-                              else round(as.numeric(r$p.value), 3))
-              })
-              plot_descriptions <- list(list(
-                type = "forest_plot",
-                title = "Forest Plot: Coefficients",
-                description = paste0("Forest plot showing regression coefficients",
-                  " with 95% CIs for: ", paste(sel, collapse = ", "), "."),
-                details = paste(desc_items, collapse = "; ")
-              ))
-            }
-          }
-        }
-        sel <- input$plot_vars
-        outcome <- input$outcome
-        if (length(plot_descriptions) == 0 && !is.null(sel) && length(sel) > 0 && !is.null(outcome)) {
-          vt <- shared$var_types
-
-          # For multiple variables: create ONE faceted plot description
-          if (length(sel) > 1) {
-            var_types_desc <- sapply(sel, function(v) {
-              is_cat <- (!is.null(vt) && v %in% vt$variable &&
-                         vt$type[vt$variable == v] == "categorical")
-              if (is_cat) "categorical" else "continuous"
-            })
-            plot_descriptions <- list(list(
-              type = "faceted_plot",
-              title = paste("Outcome by Exposures:", paste(sel, collapse = ", ")),
-              description = paste0("Faceted plot showing ", outcome, " by ",
-                length(sel), " predictor variables: ", paste(sel, collapse = ", "),
-                ". Scatter plots with regression lines for continuous variables; ",
-                "box plots for categorical variables.")
-            ))
           } else {
-            # Single variable: one plot
-            v <- sel[1]
+            label <- "Coefficients"
+            desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
+              r <- sub_df[i, ]
+              paste0(r$term, ": ", round(as.numeric(r$estimate), 2),
+                     " [", round(as.numeric(r$conf.low), 2), ", ",
+                     round(as.numeric(r$conf.high), 2), "]",
+                     ", p=", if (as.numeric(r$p.value) < 0.001) "<0.001"
+                            else round(as.numeric(r$p.value), 3))
+            })
+          }
+          plot_descriptions <- list(list(
+            type = "forest_plot",
+            title = paste("Forest Plot:", label),
+            description = paste0("Forest plot showing ", label,
+              " with 95% CIs for: ", paste(sel, collapse = ", "), "."),
+            details = paste(desc_items, collapse = "; ")
+          ))
+        }
+      }
+
+      # Additional exposure vs outcome plots (lm/lmer scatter)
+      if (mtype %in% c("lm", "lmer") && !is.null(input$plot_type_lm) && input$plot_type_lm == "scatter") {
+        sel_vars <- input$plot_vars
+        outcome <- input$outcome
+        if (!is.null(sel_vars) && length(sel_vars) > 0 && !is.null(outcome)) {
+          vt <- shared$var_types
+          if (length(sel_vars) > 1) {
+            plot_descriptions <- c(plot_descriptions, list(list(
+              type = "faceted_plot",
+              title = paste("Outcome by Exposures:", paste(sel_vars, collapse = ", ")),
+              description = paste0("Faceted plot showing ", outcome, " by ",
+                length(sel_vars), " predictor variables: ", paste(sel_vars, collapse = ", "),
+                ". Scatter plots for continuous; box plots for categorical.")
+            )))
+          } else {
+            v <- sel_vars[1]
             is_cat <- (!is.null(vt) && v %in% vt$variable &&
                        vt$type[vt$variable == v] == "categorical")
-            if (is_cat) {
-              plot_descriptions <- list(list(
-                type = "box_plot",
-                title = paste(outcome, "by", v),
-                description = paste0("Box plot of ", outcome, " by levels of ", v,
-                  " (categorical). Red diamond = group mean.")))
+            ptype <- if (is_cat) "box_plot" else "scatter_plot"
+            pdesc <- if (is_cat) {
+              paste0("Box plot of ", outcome, " by levels of ", v, " (categorical).")
             } else {
-              plot_descriptions <- list(list(
-                type = "scatter_plot",
-                title = paste(outcome, "vs", v),
-                description = paste0("Scatter plot of ", outcome, " vs ", v,
-                  " (continuous) with linear regression line and 95% CI band.")))
+              paste0("Scatter plot of ", outcome, " vs ", v, " with regression line.")
             }
+            plot_descriptions <- c(plot_descriptions, list(list(
+              type = ptype, title = paste(outcome, if (is_cat) "by" else "vs", v),
+              description = pdesc
+            )))
           }
         }
       }
