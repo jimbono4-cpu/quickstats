@@ -6,8 +6,6 @@
 # =============================================================================
 
 library(shiny)
-library(ggplot2)
-library(broom)
 
 # --- WebR detection and package installation ---------------------------------
 
@@ -19,19 +17,23 @@ is_webr <- function() {
 
 install_if_needed <- function(pkg_name) {
   if (!requireNamespace(pkg_name, quietly = TRUE)) {
-    tryCatch({
-      if (is_webr() || exists("webr")) {
-        webr::install(pkg_name, quiet = TRUE)
-      } else {
-        install.packages(pkg_name, repos = "https://cloud.r-project.org", quiet = TRUE)
+    # Try webr::install first (works in Shinylive), fall back to install.packages
+    tryCatch(
+      webr::install(pkg_name, quiet = TRUE),
+      error = function(e) {
+        tryCatch(
+          install.packages(pkg_name, repos = "https://cloud.r-project.org", quiet = TRUE),
+          error = function(e2) NULL
+        )
       }
-      # Force-load the namespace after installing
+    )
+    # Force-load into the R session
+    tryCatch(
       suppressPackageStartupMessages(
         library(pkg_name, character.only = TRUE, quietly = TRUE)
-      )
-    }, error = function(e) {
-      tryCatch(install.packages(pkg_name, quiet = TRUE), error = function(e2) NULL)
-    })
+      ),
+      error = function(e) NULL
+    )
   }
 }
 
@@ -377,31 +379,31 @@ explore_server <- function(id, shared) {
       x <- df[[v]]
 
       lbl <- v
-      if (requireNamespace("labelled", quietly = TRUE)) {
-        l <- labelled::var_label(df[[v]])
-        if (!is.null(l)) lbl <- paste0(l, " (", v, ")")
-      }
+      tryCatch({
+        if (requireNamespace("labelled", quietly = TRUE)) {
+          l <- labelled::var_label(df[[v]])
+          if (!is.null(l)) lbl <- paste0(l, " (", v, ")")
+        }
+      }, error = function(e) NULL)
 
       vt <- shared$var_types
       is_cat <- (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical") ||
                 is.character(x) || is.factor(x)
 
+      # Use base R graphics — always available, no package dependencies
+      par(mar = c(5, 4, 3, 2), family = "sans")
       if (!is_cat && is.numeric(x)) {
-        ggplot2::ggplot(data.frame(x = x), ggplot2::aes(x = x)) +
-          ggplot2::geom_histogram(bins = 30, fill = "#4e79a7", color = "white", alpha = 0.8) +
-          ggplot2::labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
-          ggplot2::theme_minimal(base_size = 14)
+        x_clean <- x[!is.na(x)]
+        hist(x_clean, breaks = 30, col = "#4e79a7", border = "white",
+             main = paste("Distribution of", lbl), xlab = lbl, ylab = "Count",
+             cex.main = 1.3, cex.lab = 1.1)
       } else {
-        freq <- as.data.frame(table(x), stringsAsFactors = FALSE)
-        names(freq) <- c("Level", "Count")
-        freq <- freq[order(-freq$Count), ]
-        if (nrow(freq) > 20) freq <- freq[1:20, ]
-        freq$Level <- factor(freq$Level, levels = rev(freq$Level))
-        ggplot2::ggplot(freq, ggplot2::aes(x = Level, y = Count)) +
-          ggplot2::geom_col(fill = "#4e79a7", alpha = 0.8) +
-          ggplot2::coord_flip() +
-          ggplot2::labs(title = paste("Distribution of", lbl), x = lbl, y = "Count") +
-          ggplot2::theme_minimal(base_size = 14)
+        freq <- sort(table(x), decreasing = TRUE)
+        if (length(freq) > 20) freq <- freq[1:20]
+        par(mar = c(5, max(8, max(nchar(names(freq))) * 0.6), 3, 2))
+        barplot(rev(freq), horiz = TRUE, las = 1, col = "#4e79a7", border = NA,
+                main = paste("Distribution of", lbl), xlab = "Count",
+                cex.main = 1.3, cex.lab = 1.1, cex.names = 0.9)
       }
     })
 
@@ -413,15 +415,16 @@ explore_server <- function(id, shared) {
         Pct_Missing = sapply(df, function(x) round(100 * sum(is.na(x)) / length(x), 1)),
         stringsAsFactors = FALSE
       )
-      miss_df <- miss_df[order(-miss_df$Pct_Missing), ]
-      miss_df$Variable <- factor(miss_df$Variable, levels = rev(miss_df$Variable))
+      miss_df <- miss_df[order(miss_df$Pct_Missing), ]
 
-      ggplot2::ggplot(miss_df, ggplot2::aes(x = Variable, y = Pct_Missing)) +
-        ggplot2::geom_col(fill = ifelse(miss_df$Pct_Missing > 0, "#e15759", "#76b7b2"), alpha = 0.8) +
-        ggplot2::coord_flip() +
-        ggplot2::labs(title = "Missing Data by Variable", x = "", y = "% Missing") +
-        ggplot2::theme_minimal(base_size = 14) +
-        ggplot2::geom_hline(yintercept = c(5, 20), linetype = "dashed", color = "grey50")
+      # Base R horizontal bar chart — no ggplot2 dependency
+      colors <- ifelse(miss_df$Pct_Missing > 0, "#e15759", "#76b7b2")
+      par(mar = c(5, max(8, max(nchar(miss_df$Variable)) * 0.6), 3, 2), family = "sans")
+      barplot(miss_df$Pct_Missing, names.arg = miss_df$Variable,
+              horiz = TRUE, las = 1, col = colors, border = NA,
+              main = "Missing Data by Variable", xlab = "% Missing",
+              cex.main = 1.3, cex.lab = 1.1, cex.names = 0.8)
+      abline(v = c(5, 20), lty = 2, col = "grey50")
     })
 
     output$missing_table <- renderTable({
@@ -1620,7 +1623,13 @@ model_server <- function(id, shared) {
     })
 
     output$model_plot <- renderPlot({
-      current_plot()
+      p <- tryCatch(current_plot(), error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Plot error:", conditionMessage(e)),
+             cex = 1.1, col = "red")
+        NULL
+      })
+      if (!is.null(p)) p
     })
 
     # Store plot info in shared for reports/LLM
