@@ -785,7 +785,7 @@ model_ui <- function(id) {
             div(style = "margin-top: 10px;",
               uiOutput(ns("plot_controls")),
               hr(),
-              plotOutput(ns("model_plot"), height = "500px"),
+              uiOutput(ns("model_plot_ui")),
               div(style = "margin-top: 10px;",
                 actionButton(ns("download_plot"), "Download Plot (PNG)",
                              class = "btn-outline-secondary btn-sm"),
@@ -1448,6 +1448,9 @@ model_server <- function(id, shared) {
       }
     })
 
+    # Track number of plots for dynamic height
+    n_plots <- reactiveVal(1)
+
     # The reactive that builds the plot object
     current_plot <- reactive({
       mod <- model_fit()
@@ -1609,16 +1612,28 @@ model_server <- function(id, shared) {
       # Return: if no plots, return NULL
       if (length(plot_list) == 0) return(NULL)
 
-      # Arrange all plots in a faceted grid
+      # Set plot count for dynamic height
+      n_plots(length(plot_list))
+
+      # Arrange all plots vertically tiled (one per row)
       if (length(plot_list) == 1) {
         plot_list[[1]]
       } else {
         tryCatch({
           install_if_needed("gridExtra")
           do.call(gridExtra::grid.arrange,
-                  c(plot_list, ncol = min(2, length(plot_list))))
+                  c(plot_list, ncol = 1))
         }, error = function(e) plot_list[[1]])
       }
+    })
+
+    # Dynamic plot height — one plot = 500px, stacked vertically 500px each
+    output$model_plot_ui <- renderUI({
+      # Trigger on current_plot so we re-render when plot changes
+      p <- tryCatch(current_plot(), error = function(e) NULL)
+      if (is.null(p)) return(plotOutput(ns("model_plot"), height = "500px"))
+      plot_height <- paste0(n_plots() * 500, "px")
+      plotOutput(ns("model_plot"), height = plot_height)
     })
 
     output$model_plot <- renderPlot({
@@ -1725,8 +1740,8 @@ model_server <- function(id, shared) {
       p <- current_plot()
       if (is.null(p)) return(NULL)
       tryCatch({
-        # Taller image for multi-plot (gridExtra) output
-        img_height <- if (inherits(p, "ggplot")) 500 else 900
+        # Scale height based on number of plots
+        img_height <- n_plots() * 500
         tmp <- tempfile(fileext = ".png")
         grDevices::png(tmp, width = 800, height = img_height, res = 120)
         if (inherits(p, "ggplot")) {
