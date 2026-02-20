@@ -6,6 +6,8 @@
 # =============================================================================
 
 library(shiny)
+library(ggplot2)
+library(broom)
 
 # --- WebR detection and package installation ---------------------------------
 
@@ -368,14 +370,7 @@ explore_server <- function(id, shared) {
     }, striped = TRUE, hover = TRUE, spacing = "s")
 
     output$dist_plot <- renderPlot({
-      req(shared$data, input$plot_var, shared$packages_ready)
-      if (!requireNamespace("ggplot2", quietly = TRUE)) {
-        install_if_needed("ggplot2")
-      }
-      if (!requireNamespace("ggplot2", quietly = TRUE)) {
-        plot.new(); text(0.5, 0.5, "ggplot2 not available.", cex = 1.2)
-        return()
-      }
+      req(shared$data, input$plot_var)
       df <- shared$data
       v <- input$plot_var
       if (!(v %in% names(df))) return(NULL)
@@ -412,7 +407,6 @@ explore_server <- function(id, shared) {
 
     output$missing_plot <- renderPlot({
       req(shared$data)
-      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       df <- shared$data
       miss_df <- data.frame(
         Variable = names(df),
@@ -1282,11 +1276,6 @@ model_server <- function(id, shared) {
     diagnostics_forest_plot <- reactive({
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
-      req(shared$packages_ready)
-      if (!requireNamespace("ggplot2", quietly = TRUE)) {
-        install_if_needed("ggplot2")
-      }
-      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
 
       plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
       if (nrow(plot_df) == 0) return(NULL)
@@ -1461,11 +1450,6 @@ model_server <- function(id, shared) {
     current_plot <- reactive({
       mod <- model_fit()
       if (is.null(mod)) return(NULL)
-      req(shared$packages_ready)
-      if (!requireNamespace("ggplot2", quietly = TRUE)) {
-        install_if_needed("ggplot2")
-      }
-      if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       mtype <- input$model_type
 
       # Get analytical sample size for titles
