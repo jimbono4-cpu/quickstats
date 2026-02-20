@@ -2445,28 +2445,58 @@ results_server <- function(id, shared) {
     }
 
     generate_html_report <- function() {
-      # Build Table 1 HTML with title
+      # Use the exact same rendered HTML from the app for Table 1 and Table 2
       table1_html <- ""
       table1_title <- ""
-      if (!is.null(shared$table1)) {
+      if (!is.null(shared$table1_html) && nchar(shared$table1_html) > 0) {
+        # Use the exact HTML rendered in Step 3
+        table1_html <- shared$table1_html
         n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
         table1_title <- paste0("Table 1. Characteristics of participants (N = ", n_t1, ")")
-        if (is.data.frame(shared$table1)) {
-          tbl_copy <- shared$table1
-          tbl_copy$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl_copy$Variable)
-          table1_html <- df_to_html_table(tbl_copy, title = table1_title)
-        } else {
-          table1_html <- paste0("<pre>",
-            paste(capture.output(print(shared$table1)), collapse = "\n"),
-            "</pre>")
-        }
+      } else if (!is.null(shared$table1)) {
+        # Fallback: rebuild from data frame
+        n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+        table1_title <- paste0("Table 1. Characteristics of participants (N = ", n_t1, ")")
+        table1_html <- df_to_html_table(shared$table1, title = table1_title)
       }
 
-      # Build regression results HTML with title and AIC/BIC
+      # Build regression results — use the exact HTML rendered in Step 4
       regression_html <- ""
       table2_title <- ""
       fit_stats_html <- ""
-      if (!is.null(shared$model_result)) {
+      if (!is.null(shared$model_result_html) && nchar(shared$model_result_html) > 0) {
+        # Use the exact HTML rendered in Step 4
+        regression_html <- shared$model_result_html
+        # Extract title for the section header
+        if (!is.null(shared$model_result)) {
+          res <- shared$model_result
+          n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+          is_binary_mixed <- isTRUE(res$is_binary_mixed)
+          estimate_desc <- switch(res$type,
+            "lm" = "Linear regression coefficients",
+            "glm" = "Odds ratios from logistic regression",
+            "cox" = "Hazard ratios from Cox proportional hazards regression",
+            "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
+                     else "Mixed-effects linear regression coefficients",
+            res$type)
+          table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
+        }
+        # AIC/BIC
+        if (!is.null(shared$model_result)) {
+          tryCatch({
+            aic_val <- tryCatch(round(AIC(shared$model_result$fit), 1), error = function(e) NULL)
+            bic_val <- tryCatch(round(BIC(shared$model_result$fit), 1), error = function(e) NULL)
+            parts <- c()
+            if (!is.null(aic_val) && is.finite(aic_val)) parts <- c(parts, paste0("AIC = ", aic_val))
+            if (!is.null(bic_val) && is.finite(bic_val)) parts <- c(parts, paste0("BIC = ", bic_val))
+            if (length(parts) > 0) {
+              fit_stats_html <- paste0('<p style="color:#555; font-size:0.9em;"><strong>Model fit:</strong> ',
+                                      paste(parts, collapse = " &nbsp;&nbsp; "), '</p>')
+            }
+          }, error = function(e) NULL)
+        }
+      } else if (!is.null(shared$model_result)) {
+        # Fallback: rebuild from data
         res <- shared$model_result
         display_df <- res$tidy
         display_df$estimate <- round(display_df$estimate, 4)
@@ -2474,8 +2504,6 @@ results_server <- function(id, shared) {
         display_df$statistic <- round(display_df$statistic, 3)
         display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
                                      round(display_df$p.value, 4))
-
-        # Build Table 2 title matching Step 4
         n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
         estimate_desc <- switch(res$type,
@@ -2486,20 +2514,6 @@ results_server <- function(id, shared) {
                    else "Mixed-effects linear regression coefficients",
           res$type)
         table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
-
-        # AIC/BIC
-        tryCatch({
-          aic_val <- tryCatch(round(AIC(res$fit), 1), error = function(e) NULL)
-          bic_val <- tryCatch(round(BIC(res$fit), 1), error = function(e) NULL)
-          parts <- c()
-          if (!is.null(aic_val) && is.finite(aic_val)) parts <- c(parts, paste0("AIC = ", aic_val))
-          if (!is.null(bic_val) && is.finite(bic_val)) parts <- c(parts, paste0("BIC = ", bic_val))
-          if (length(parts) > 0) {
-            fit_stats_html <- paste0('<p style="color:#555; font-size:0.9em;"><strong>Model fit:</strong> ',
-                                    paste(parts, collapse = " &nbsp;&nbsp; "), '</p>')
-          }
-        }, error = function(e) NULL)
-
         regression_html <- df_to_html_table(display_df, title = table2_title)
       }
 
@@ -2647,9 +2661,14 @@ results_server <- function(id, shared) {
 
       if (!is.null(shared$table1)) {
         n_t1 <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+        # Strip **bold** markdown from variable labels for plain text
+        tbl_txt <- shared$table1
+        if (is.data.frame(tbl_txt) && "Variable" %in% names(tbl_txt)) {
+          tbl_txt$Variable <- gsub("\\*\\*(.+?)\\*\\*", "\\1", tbl_txt$Variable)
+        }
         lines <- c(lines,
           paste0("TABLE 1. CHARACTERISTICS OF PARTICIPANTS (N = ", n_t1, ")"), "",
-          paste(capture.output(print(shared$table1)), collapse = "\n"), "")
+          paste(capture.output(print(tbl_txt, row.names = FALSE)), collapse = "\n"), "")
       }
 
       if (!is.null(shared$model_result)) {
@@ -2664,18 +2683,34 @@ results_server <- function(id, shared) {
           "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
                    else "Mixed-effects linear regression coefficients",
           res$type))
+
+        # Build text table matching the app column order
+        is_exp <- res$type %in% c("glm", "cox") || (res$type == "lmer" && is_binary_mixed)
+        txt_df <- data.frame(
+          Term = tidy_df$term,
+          Estimate = unname(round(as.numeric(tidy_df$estimate), 2)),
+          stringsAsFactors = FALSE
+        )
+        if (is_exp && "OR_HR" %in% names(tidy_df)) {
+          or_label <- if (res$type == "cox") "HR" else "OR"
+          txt_df[[or_label]] <- unname(round(as.numeric(tidy_df$OR_HR), 2))
+        }
+        if ("conf.low" %in% names(tidy_df)) {
+          txt_df[["CI Lower"]] <- unname(round(as.numeric(tidy_df$conf.low), 2))
+          txt_df[["CI Upper"]] <- unname(round(as.numeric(tidy_df$conf.high), 2))
+        }
+        if (is_exp && "ci_lower" %in% names(tidy_df)) {
+          txt_df[["CI Lower"]] <- unname(round(as.numeric(tidy_df$ci_lower), 2))
+          txt_df[["CI Upper"]] <- unname(round(as.numeric(tidy_df$ci_upper), 2))
+        }
+        txt_df[["P-value"]] <- ifelse(as.numeric(tidy_df$p.value) < 0.001, "<0.001",
+                                       as.character(round(as.numeric(tidy_df$p.value), 3)))
+        txt_df[["Std. Error"]] <- unname(round(as.numeric(tidy_df$std.error), 2))
+        txt_df[["Statistic"]] <- unname(round(as.numeric(tidy_df$statistic), 2))
+
         lines <- c(lines,
           paste0("TABLE 2. ", estimate_desc, " (N = ", n_model, ")"), "",
-          paste(capture.output(print(
-            data.frame(
-              Term = tidy_df$term,
-              Estimate = round(tidy_df$estimate, 4),
-              SE = round(tidy_df$std.error, 4),
-              Statistic = round(tidy_df$statistic, 3),
-              P = ifelse(tidy_df$p.value < 0.001, "<0.001", round(tidy_df$p.value, 4)),
-              stringsAsFactors = FALSE
-            ), row.names = FALSE
-          )), collapse = "\n"), "")
+          paste(capture.output(print(txt_df, row.names = FALSE)), collapse = "\n"), "")
         # AIC/BIC
         tryCatch({
           aic_val <- tryCatch(round(AIC(res$fit), 1), error = function(e) NULL)
