@@ -1085,25 +1085,33 @@ model_server <- function(id, shared) {
       display_df$statistic <- unname(round(as.numeric(display_df$statistic), 2))
       display_df$p.value <- ifelse(as.numeric(display_df$p.value) < 0.001, "<0.001",
                                    as.character(round(as.numeric(display_df$p.value), 3)))
-      if ("conf.low" %in% names(display_df))
-        display_df$conf.low <- unname(round(as.numeric(display_df$conf.low), 2))
-      if ("conf.high" %in% names(display_df))
-        display_df$conf.high <- unname(round(as.numeric(display_df$conf.high), 2))
       if ("OR_HR" %in% names(display_df))
         display_df$OR_HR <- unname(round(as.numeric(display_df$OR_HR), 2))
       if ("ci_lower" %in% names(display_df))
         display_df$ci_lower <- unname(round(as.numeric(display_df$ci_lower), 2))
       if ("ci_upper" %in% names(display_df))
         display_df$ci_upper <- unname(round(as.numeric(display_df$ci_upper), 2))
+      if ("conf.low" %in% names(display_df))
+        display_df$conf.low <- unname(round(as.numeric(display_df$conf.low), 2))
+      if ("conf.high" %in% names(display_df))
+        display_df$conf.high <- unname(round(as.numeric(display_df$conf.high), 2))
 
-      # Rename confidence interval columns for publication
-      if ("conf.low" %in% names(display_df)) {
-        names(display_df)[names(display_df) == "conf.low"] <- "CI Lower"
-        names(display_df)[names(display_df) == "conf.high"] <- "CI Upper"
+      # For exponentiated models (glm/cox/binary lmer), use ci_lower/ci_upper (OR/HR scale)
+      # and DROP the raw log-odds conf.low/conf.high to avoid duplicate CI columns
+      is_exp <- input$model_type %in% c("glm", "cox") ||
+                (input$model_type == "lmer" && mixed_model_binary())
+      if (is_exp && "ci_lower" %in% names(display_df)) {
+        display_df$conf.low <- NULL
+        display_df$conf.high <- NULL
       }
+
+      # Rename columns for publication
       if ("ci_lower" %in% names(display_df)) {
         names(display_df)[names(display_df) == "ci_lower"] <- "CI Lower"
         names(display_df)[names(display_df) == "ci_upper"] <- "CI Upper"
+      } else if ("conf.low" %in% names(display_df)) {
+        names(display_df)[names(display_df) == "conf.low"] <- "CI Lower"
+        names(display_df)[names(display_df) == "conf.high"] <- "CI Upper"
       }
       if ("OR_HR" %in% names(display_df)) {
         or_label <- if (input$model_type == "cox") "HR" else "OR"
@@ -1115,9 +1123,7 @@ model_server <- function(id, shared) {
       names(display_df)[names(display_df) == "statistic"] <- "Statistic"
       names(display_df)[names(display_df) == "p.value"] <- "P-value"
 
-      # Reorder columns: Term, Estimate immediately before CI, P-value last
-      is_exp <- input$model_type %in% c("glm", "cox") ||
-                (input$model_type == "lmer" && mixed_model_binary())
+      # Reorder columns: Term, Estimate immediately before CI, P-value after CI
       if (is_exp) {
         or_label <- if (input$model_type == "cox") "HR" else "OR"
         desired_order <- c("Term", "Estimate", or_label,
@@ -1411,16 +1417,9 @@ model_server <- function(id, shared) {
         tagList(
           forest_section,
           hr(),
-          p(strong("Additional: Kaplan-Meier Survival Curve")),
-          selectInput(ns("plot_type_cox"), "Show KM curve:",
-            choices = c("Forest Plot only" = "forest",
-                        "Also show KM curve" = "km"),
-            selected = "forest"),
-          conditionalPanel(
-            condition = paste0("input['", ns("plot_type_cox"), "'] == 'km'"),
-            selectInput(ns("km_strata"), "Stratify survival curve by:",
-              choices = km_choices, selected = km_choices[1])
-          )
+          p(strong("Kaplan-Meier Survival Curve")),
+          selectInput(ns("km_strata"), "Stratify survival curve by:",
+            choices = km_choices, selected = km_choices[1])
         )
       } else if (mtype == "glm" || (mtype == "lmer" && mixed_model_binary())) {
         or_label <- if (mtype == "glm") "Odds Ratios" else "Odds Ratios (mixed-effects)"
@@ -1534,8 +1533,8 @@ model_server <- function(id, shared) {
         }
       }
 
-      # --- KM survival curve (Cox only, if selected) ---
-      if (mtype == "cox" && !is.null(input$plot_type_cox) && input$plot_type_cox == "km") {
+      # --- KM survival curve (Cox only — always shown) ---
+      if (mtype == "cox") {
         if (requireNamespace("survival", quietly = TRUE)) {
           km_var <- input$km_strata
           if (!is.null(km_var) && km_var %in% names(shared$data)) {
@@ -1726,42 +1725,18 @@ model_server <- function(id, shared) {
       p <- current_plot()
       if (is.null(p)) return(NULL)
       tryCatch({
+        # Taller image for multi-plot (gridExtra) output
+        img_height <- if (inherits(p, "ggplot")) 500 else 900
         tmp <- tempfile(fileext = ".png")
-        grDevices::png(tmp, width = 800, height = 500, res = 120)
+        grDevices::png(tmp, width = 800, height = img_height, res = 120)
         if (inherits(p, "ggplot")) {
           print(p)
+        } else if (inherits(p, "gtable") || inherits(p, "grob") || inherits(p, "gTree")) {
+          # gridExtra output is a gtable/grob — draw it
+          grid::grid.draw(p)
         } else {
-          # gridExtra already drew to device in renderPlot; re-render here
-          df <- shared$data
-          if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
-          sel <- input$plot_vars
-          outcome <- input$outcome
-          plot_list <- lapply(sel, function(v) {
-            vt <- shared$var_types
-            is_cat <- (!is.null(vt) && v %in% vt$variable &&
-                       vt$type[vt$variable == v] == "categorical") ||
-                      is.factor(df[[v]]) || is.character(df[[v]])
-            if (is_cat) {
-              ggplot2::ggplot(df, ggplot2::aes(x = factor(.data[[v]]), y = .data[[outcome]])) +
-                ggplot2::geom_boxplot(fill = "#4e79a7", alpha = 0.5) +
-                ggplot2::labs(title = paste(outcome, "by", v), x = v, y = outcome) +
-                ggplot2::theme_minimal(base_size = 12)
-            } else {
-              ggplot2::ggplot(df, ggplot2::aes(x = .data[[v]], y = .data[[outcome]])) +
-                ggplot2::geom_point(alpha = 0.4, color = "#4e79a7", size = 1.5) +
-                ggplot2::geom_smooth(method = "lm", se = TRUE, color = "#e15759") +
-                ggplot2::labs(title = paste(outcome, "vs", v), x = v, y = outcome) +
-                ggplot2::theme_minimal(base_size = 12)
-            }
-          })
-          if (length(plot_list) == 1) {
-            print(plot_list[[1]])
-          } else {
-            tryCatch({
-              install_if_needed("gridExtra")
-              do.call(gridExtra::grid.arrange, c(plot_list, ncol = min(2, length(plot_list))))
-            }, error = function(e) print(plot_list[[1]]))
-          }
+          # Fallback: try printing
+          print(p)
         }
         grDevices::dev.off()
         raw <- readBin(tmp, "raw", file.info(tmp)$size)
