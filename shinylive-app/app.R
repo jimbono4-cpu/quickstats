@@ -1643,7 +1643,14 @@ model_server <- function(id, shared) {
              cex = 1.1, col = "red")
         NULL
       })
-      if (!is.null(p)) p
+      if (is.null(p)) return()
+      if (inherits(p, "ggplot")) {
+        p
+      } else {
+        # gridExtra gtable — must explicitly draw
+        grid::grid.newpage()
+        grid::grid.draw(p)
+      }
     })
 
     # Store plot info in shared for reports/LLM
