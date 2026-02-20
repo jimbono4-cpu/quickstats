@@ -1115,16 +1115,16 @@ model_server <- function(id, shared) {
       names(display_df)[names(display_df) == "statistic"] <- "Statistic"
       names(display_df)[names(display_df) == "p.value"] <- "P-value"
 
-      # Reorder columns: Term, Estimate, CI, then P-value last
+      # Reorder columns: Term, Estimate immediately before CI, P-value last
       is_exp <- input$model_type %in% c("glm", "cox") ||
                 (input$model_type == "lmer" && mixed_model_binary())
       if (is_exp) {
         or_label <- if (input$model_type == "cox") "HR" else "OR"
-        desired_order <- c("Term", "Estimate", "Std. Error", or_label,
-                           "CI Lower", "CI Upper", "Statistic", "P-value")
+        desired_order <- c("Term", "Estimate", or_label,
+                           "CI Lower", "CI Upper", "Std. Error", "Statistic", "P-value")
       } else {
-        desired_order <- c("Term", "Estimate", "Std. Error",
-                           "CI Lower", "CI Upper", "Statistic", "P-value")
+        desired_order <- c("Term", "Estimate",
+                           "CI Lower", "CI Upper", "Std. Error", "Statistic", "P-value")
       }
       # Keep only columns that exist, in the desired order
       desired_order <- desired_order[desired_order %in% names(display_df)]
@@ -3070,7 +3070,7 @@ server <- function(input, output, session) {
   # --- Package installation with progress ------------------------------------
   # Install packages in server so we can show progress to the user
   observe({
-    pkgs <- c("ggplot2", "broom", "labelled",
+    pkgs <- c("munsell", "ggplot2", "broom", "labelled",
               "survival", "sandwich", "lmtest", "car", "emmeans",
               "haven", "readxl", "writexl", "lme4",
               "gridExtra", "base64enc")
