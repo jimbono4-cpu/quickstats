@@ -1121,10 +1121,10 @@ model_server <- function(id, shared) {
       if (is_exp) {
         or_label <- if (input$model_type == "cox") "HR" else "OR"
         desired_order <- c("Term", "Estimate", or_label,
-                           "CI Lower", "CI Upper", "Std. Error", "Statistic", "P-value")
+                           "CI Lower", "CI Upper", "P-value", "Std. Error", "Statistic")
       } else {
         desired_order <- c("Term", "Estimate",
-                           "CI Lower", "CI Upper", "Std. Error", "Statistic", "P-value")
+                           "CI Lower", "CI Upper", "P-value", "Std. Error", "Statistic")
       }
       # Keep only columns that exist, in the desired order
       desired_order <- desired_order[desired_order %in% names(display_df)]
