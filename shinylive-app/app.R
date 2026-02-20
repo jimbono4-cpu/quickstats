@@ -1746,18 +1746,19 @@ model_server <- function(id, shared) {
         grDevices::png(tmp, width = 800, height = img_height, res = 120)
         if (inherits(p, "ggplot")) {
           print(p)
-        } else if (inherits(p, "gtable") || inherits(p, "grob") || inherits(p, "gTree")) {
-          # gridExtra output is a gtable/grob — draw it
-          grid::grid.draw(p)
         } else {
-          # Fallback: try printing
-          print(p)
+          # gridExtra output — must use grid.newpage + grid.draw
+          grid::grid.newpage()
+          grid::grid.draw(p)
         }
         grDevices::dev.off()
         raw <- readBin(tmp, "raw", file.info(tmp)$size)
         unlink(tmp)
         paste0("data:image/png;base64,", base64enc::base64encode(raw))
-      }, error = function(e) NULL)
+      }, error = function(e) {
+        tryCatch(grDevices::dev.off(), error = function(e2) NULL)
+        NULL
+      })
     }
 
     # Download plot as PNG
@@ -1790,15 +1791,15 @@ model_server <- function(id, shared) {
       session$sendCustomMessage("copyPlotToClipboard", list(data = b64))
     })
 
-    # Store base64 for report use
+    # Store base64 for report use — re-generate whenever current_plot changes
     observe({
-      mod <- model_fit()
-      if (is.null(mod)) {
+      p <- current_plot()
+      if (is.null(p)) {
         shared$plot_base64 <- NULL
         return()
       }
-      # Defer to avoid running before plot is ready
-      invalidateLater(1000)
+      # Defer slightly so renderPlot has finished
+      invalidateLater(500)
       shared$plot_base64 <- tryCatch(get_plot_base64(), error = function(e) NULL)
     })
   })
