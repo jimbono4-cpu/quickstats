@@ -364,8 +364,10 @@ explore_server <- function(id, shared) {
     }, striped = TRUE, hover = TRUE, spacing = "s")
 
     output$dist_plot <- renderPlot({
-      req(shared$data, input$plot_var)
-      install_if_needed("ggplot2")
+      req(shared$data, input$plot_var, shared$packages_ready)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        install_if_needed("ggplot2")
+      }
       if (!requireNamespace("ggplot2", quietly = TRUE)) {
         plot.new(); text(0.5, 0.5, "ggplot2 not available.", cex = 1.2)
         return()
@@ -700,7 +702,10 @@ table1_server <- function(id, shared) {
       }
       n_total <- if (!is.null(shared$data)) nrow(shared$data) else "?"
       title <- paste0("Table 1. Characteristics of participants (N = ", n_total, ")")
-      HTML(df_to_html_table(tbl, title = title, id = ns("table1_html")))
+      rendered_html <- df_to_html_table(tbl, title = title, id = ns("table1_html"))
+      # Store for reuse in Step 5
+      shared$table1_html <- rendered_html
+      HTML(rendered_html)
     })
 
     observeEvent(input$export_html, {
@@ -1119,8 +1124,11 @@ model_server <- function(id, shared) {
         }
       }
 
-      table_html <- HTML(df_to_html_table(display_df, title = table2_title,
-                                          id = ns("model_results_html")))
+      rendered_html <- df_to_html_table(display_df, title = table2_title,
+                                          id = ns("model_results_html"))
+      # Store for reuse in Step 5
+      shared$model_result_html <- rendered_html
+      table_html <- HTML(rendered_html)
       tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
     })
 
@@ -1234,7 +1242,10 @@ model_server <- function(id, shared) {
     diagnostics_forest_plot <- reactive({
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
-      install_if_needed("ggplot2")
+      req(shared$packages_ready)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        install_if_needed("ggplot2")
+      }
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
 
       plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
@@ -1416,7 +1427,10 @@ model_server <- function(id, shared) {
     current_plot <- reactive({
       mod <- model_fit()
       if (is.null(mod)) return(NULL)
-      install_if_needed("ggplot2")
+      req(shared$packages_ready)
+      if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        install_if_needed("ggplot2")
+      }
       if (!requireNamespace("ggplot2", quietly = TRUE)) return(NULL)
       mtype <- input$model_type
 
@@ -1860,11 +1874,15 @@ results_server <- function(id, shared) {
     ns <- session$ns
 
     output$show_table1 <- renderUI({
+      # Show the exact same table HTML that was generated in Step 3
+      html <- shared$table1_html
+      if (!is.null(html) && nchar(html) > 0) return(HTML(html))
+      # Fallback: render from data frame
       tbl <- shared$table1
       if (is.null(tbl)) return(p(class = "text-muted", "No Table 1 generated yet. Go to Step 3."))
       if (is.data.frame(tbl)) {
-        tbl$Variable <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", tbl$Variable)
-        HTML(df_to_html_table(tbl, title = "Table 1. Descriptive Statistics"))
+        n_total <- if (!is.null(shared$data)) nrow(shared$data) else "?"
+        HTML(df_to_html_table(tbl, title = paste0("Table 1. Characteristics of participants (N = ", n_total, ")")))
       } else {
         HTML(paste("<pre>", paste(capture.output(print(tbl)), collapse = "\n"), "</pre>"))
       }
@@ -1926,17 +1944,13 @@ results_server <- function(id, shared) {
     })
 
     output$show_regression <- renderUI({
+      # Show the exact same table HTML that was generated in Step 4
+      html <- shared$model_result_html
+      if (!is.null(html) && nchar(html) > 0) return(HTML(html))
+      # Fallback
       res <- shared$model_result
       if (is.null(res)) return(p(class = "text-muted", "No model fitted yet. Go to Step 4."))
-
-      display_df <- res$tidy
-      display_df$estimate <- round(display_df$estimate, 4)
-      display_df$std.error <- round(display_df$std.error, 4)
-      display_df$statistic <- round(display_df$statistic, 3)
-      display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
-                                   round(display_df$p.value, 4))
-
-      HTML(df_to_html_table(display_df, title = "Regression Results"))
+      HTML(df_to_html_table(res$tidy, title = "Regression Results"))
     })
 
     # --- Analysis manifest builder ---
@@ -3049,12 +3063,15 @@ server <- function(input, output, session) {
     data_name = NULL,
     var_types = NULL,
     table1 = NULL,
+    table1_html = NULL,
     model_result = NULL,
+    model_result_html = NULL,
     plots = NULL,
     plot_base64 = NULL,
     diagnostics_plot = NULL,
     diagnostics_plot_base64 = NULL,
-    last_export = NULL
+    last_export = NULL,
+    packages_ready = FALSE
   )
 
   # --- Package installation with progress ------------------------------------
@@ -3075,11 +3092,15 @@ server <- function(input, output, session) {
       install_if_needed(pkgs[i])
     }
 
+    # Force-load ggplot2 into the namespace so requireNamespace() finds it
+    tryCatch(library(ggplot2), error = function(e) NULL)
+
     session$sendCustomMessage("updateLoadingProgress", list(
       pct = 100,
       message = "All packages loaded. Ready!"
     ))
     session$sendCustomMessage("hideLoadingOverlay", list())
+    shared$packages_ready <- TRUE
   }) |> bindEvent(TRUE, once = TRUE)
 
   # Current step tracker
