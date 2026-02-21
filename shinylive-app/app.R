@@ -3097,37 +3097,49 @@ server <- function(input, output, session) {
     diagnostics_plot = NULL,
     diagnostics_plot_base64 = NULL,
     last_export = NULL,
-    packages_ready = FALSE
+    packages_ready = FALSE,
+    modeling_ready = FALSE
   )
 
   # --- Package installation with progress ------------------------------------
-  # Install packages in server so we can show progress to the user
+  # Phase 1: Install ESSENTIAL packages only (Steps 1-2) — fast startup
   observe({
-    pkgs <- c("munsell", "ggplot2", "broom", "labelled",
-              "survival", "sandwich", "lmtest", "car", "emmeans",
-              "haven", "readxl", "writexl", "lme4",
-              "gridExtra", "base64enc")
-    total <- length(pkgs)
+    essential_pkgs <- c("haven", "readxl", "labelled")
+    total <- length(essential_pkgs)
 
-    for (i in seq_along(pkgs)) {
+    for (i in seq_along(essential_pkgs)) {
       pct <- round(100 * i / total)
       session$sendCustomMessage("updateLoadingProgress", list(
         pct = pct,
-        message = paste0("Installing ", pkgs[i], " (", i, "/", total, ") ... ", pct, "%")
+        message = paste0("Installing ", essential_pkgs[i], " (", i, "/", total, ") ... ", pct, "%")
       ))
-      install_if_needed(pkgs[i])
+      install_if_needed(essential_pkgs[i])
+    }
+
+    session$sendCustomMessage("updateLoadingProgress", list(
+      pct = 100,
+      message = "Ready! Loading additional packages in background..."
+    ))
+    session$sendCustomMessage("hideLoadingOverlay", list())
+    shared$packages_ready <- TRUE
+  }) |> bindEvent(TRUE, once = TRUE)
+
+  # Phase 2: Install DEFERRED packages in background (Steps 3-5)
+  observe({
+    req(shared$packages_ready)
+    deferred_pkgs <- c("munsell", "ggplot2", "broom",
+                       "survival", "sandwich", "lmtest", "car", "emmeans",
+                       "writexl", "lme4", "gridExtra", "base64enc")
+
+    for (pkg in deferred_pkgs) {
+      install_if_needed(pkg)
     }
 
     # Force-load ggplot2 into the namespace so requireNamespace() finds it
     tryCatch(library(ggplot2), error = function(e) NULL)
 
-    session$sendCustomMessage("updateLoadingProgress", list(
-      pct = 100,
-      message = "All packages loaded. Ready!"
-    ))
-    session$sendCustomMessage("hideLoadingOverlay", list())
-    shared$packages_ready <- TRUE
-  }) |> bindEvent(TRUE, once = TRUE)
+    shared$modeling_ready <- TRUE
+  }) |> bindEvent(shared$packages_ready, once = TRUE)
 
   # Current step tracker
   current_step <- reactiveVal(1)
@@ -3157,28 +3169,39 @@ server <- function(input, output, session) {
       paste0("Step ", step, " of ", total_steps, ": ", step_names[step]))
   })
 
+  # Helper: check if modeling packages are ready before allowing Step 3+
+  navigate_to_step <- function(target_step) {
+    if (target_step >= 3 && !isTRUE(shared$modeling_ready)) {
+      showNotification(
+        "Additional packages are still loading. Please wait a moment...",
+        type = "warning", duration = 3
+      )
+      return(FALSE)
+    }
+    current_step(target_step)
+    updateTabsetPanel(session, "wizard", selected = step_ids[target_step])
+    return(TRUE)
+  }
+
   # Navigation
   observeEvent(input$next_step, {
     step <- current_step()
     if (step < total_steps) {
-      current_step(step + 1)
-      updateTabsetPanel(session, "wizard", selected = step_ids[step + 1])
+      navigate_to_step(step + 1)
     }
   })
 
   observeEvent(input$prev_step, {
     step <- current_step()
     if (step > 1) {
-      current_step(step - 1)
-      updateTabsetPanel(session, "wizard", selected = step_ids[step - 1])
+      navigate_to_step(step - 1)
     }
   })
 
   observeEvent(input$goto_step, {
     step <- input$goto_step
     if (step >= 1 && step <= total_steps) {
-      current_step(step)
-      updateTabsetPanel(session, "wizard", selected = step_ids[step])
+      navigate_to_step(step)
     }
   })
 
