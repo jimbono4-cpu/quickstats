@@ -3124,21 +3124,26 @@ server <- function(input, output, session) {
     shared$packages_ready <- TRUE
   }) |> bindEvent(TRUE, once = TRUE)
 
-  # Phase 2: Install DEFERRED packages in background (Steps 3-5)
+  # Phase 2: Install DEFERRED packages AFTER UI has flushed
+  # Using later() to break the synchronous chain — without this,
+  # Phase 2 fires before hideLoadingOverlay reaches the browser.
   observe({
     req(shared$packages_ready)
+
     deferred_pkgs <- c("munsell", "ggplot2", "broom",
                        "survival", "sandwich", "lmtest", "car", "emmeans",
                        "writexl", "lme4", "gridExtra", "base64enc")
 
-    for (pkg in deferred_pkgs) {
-      install_if_needed(pkg)
-    }
-
-    # Force-load ggplot2 into the namespace so requireNamespace() finds it
-    tryCatch(library(ggplot2), error = function(e) NULL)
-
-    shared$modeling_ready <- TRUE
+    # Schedule deferred install after a short delay so the overlay
+    # hide message flushes to the browser first
+    later::later(function() {
+      for (pkg in deferred_pkgs) {
+        install_if_needed(pkg)
+      }
+      # Force-load ggplot2 into the namespace
+      tryCatch(library(ggplot2), error = function(e) NULL)
+      shared$modeling_ready <- TRUE
+    }, delay = 0.5)
   }) |> bindEvent(shared$packages_ready, once = TRUE)
 
   # Current step tracker
