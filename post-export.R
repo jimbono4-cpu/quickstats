@@ -35,9 +35,10 @@ optimized <- '<!doctype html>
     <link rel="stylesheet" href="./shinylive/style-resets.css" />
     <link rel="stylesheet" href="./shinylive/shinylive.css" />
     <style>
-      /* Suppress Shinylive built-in loading screen (hex spinner on white bg) */
+      /* Hide Shinylive loading screen visually but keep in DOM so init works */
       .shinylive-viewer .loading-wrapper {
-        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
       }
       /* Our preloader: max z-index, fully opaque, covers everything */
       .app-preloader {
@@ -121,28 +122,49 @@ optimized <- '<!doctype html>
 
       requestAnimationFrame(tick);
 
-      /* Poll for #next_step button — only exists when the real Shiny app
-         has fully rendered, not when Shinylive shows its hex spinner */
-      function checkShinyReady() {
+      /* Detect when Shinylive finishes loading:
+         Shinylive removes .loading-wrapper from the DOM once the app iframe
+         is ready. We also check for an iframe with content as a fallback.
+         NOTE: #next_step is inside an iframe so getElementById cannot reach it. */
+      function dismissPreloader() {
         if (done) return;
-        var btn = document.getElementById(\"next_step\");
-        if (btn) {
-          done = true;
-          if (bar) bar.style.width = \"100%\";
-          if (pctEl) pctEl.textContent = \"100%\";
-          if (statusEl) statusEl.textContent = \"Ready!\";
-          var pre = document.getElementById(\"preloader\");
-          if (pre) {
-            setTimeout(function() {
-              pre.classList.add(\"hidden\");
-              setTimeout(function() { pre.remove(); }, 600);
-            }, 400);
-          }
-        } else {
-          setTimeout(checkShinyReady, 300);
+        done = true;
+        if (bar) bar.style.width = \"100%\";
+        if (pctEl) pctEl.textContent = \"100%\";
+        if (statusEl) statusEl.textContent = \"Ready!\";
+        var pre = document.getElementById(\"preloader\");
+        if (pre) {
+          setTimeout(function() {
+            pre.classList.add(\"hidden\");
+            setTimeout(function() { pre.remove(); }, 600);
+          }, 400);
         }
       }
-      setTimeout(checkShinyReady, 1000);
+
+      function checkShinyReady() {
+        if (done) return;
+        var root = document.getElementById(\"root\");
+        /* Method 1: loading-wrapper is gone (Shinylive removed it) */
+        var lw = root ? root.querySelector(\".loading-wrapper\") : null;
+        var viewer = root ? root.querySelector(\".shinylive-viewer\") : null;
+        if (viewer && !lw) {
+          dismissPreloader();
+          return;
+        }
+        /* Method 2: iframe exists and has loaded (src set or contentWindow) */
+        var iframe = root ? root.querySelector(\"iframe\") : null;
+        if (iframe && iframe.contentWindow) {
+          try {
+            var iframeBody = iframe.contentDocument && iframe.contentDocument.body;
+            if (iframeBody && iframeBody.children.length > 0) {
+              dismissPreloader();
+              return;
+            }
+          } catch(e) { /* cross-origin — fall through */ }
+        }
+        setTimeout(checkShinyReady, 500);
+      }
+      setTimeout(checkShinyReady, 2000);
     })();
     </script>
   </body>
