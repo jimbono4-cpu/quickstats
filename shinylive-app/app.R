@@ -906,29 +906,6 @@ model_server <- function(id, shared) {
           },
           "lmer" = {
             req(input$random_var)
-            # lme4 needs compiled deps — force install each one explicitly
-            lme4_deps <- c("Rcpp", "RcppEigen", "Matrix", "minqa", "nloptr",
-                           "nlme", "reformulas", "lme4")
-            for (dep in lme4_deps) {
-              if (!requireNamespace(dep, quietly = TRUE)) {
-                tryCatch(
-                  webr::install(dep),
-                  error = function(e) NULL
-                )
-              }
-            }
-            # Final attempt: try loading lme4 and report the actual error if it fails
-            load_err <- tryCatch({
-              loadNamespace("lme4")
-              NULL
-            }, error = function(e) conditionMessage(e))
-            if (!is.null(load_err)) {
-              stop(paste("Mixed models require lme4. Load error:", load_err))
-            }
-            mixed_formula <- as.formula(paste(
-              outcome, "~", paste(preds, collapse = " + "),
-              "+ (1 |", input$random_var, ")"
-            ))
             # Auto-detect binary vs continuous outcome
             outcome_vals <- na.omit(df[[outcome]])
             is_binary <- is.logical(outcome_vals) ||
@@ -937,7 +914,21 @@ model_server <- function(id, shared) {
               (is.character(outcome_vals) && length(unique(outcome_vals)) == 2)
             mixed_model_binary(is_binary)
             if (is_binary) {
-              # Convert to numeric 0/1 if needed
+              # Binary outcome: try lme4::glmer, give clear error if unavailable
+              lme4_ok <- tryCatch({ loadNamespace("lme4"); TRUE }, error = function(e) FALSE)
+              if (!lme4_ok) {
+                for (dep in c("Rcpp", "RcppEigen", "Matrix", "minqa", "nloptr", "reformulas", "lme4")) {
+                  tryCatch(webr::install(dep), error = function(e) NULL)
+                }
+                lme4_ok <- tryCatch({ loadNamespace("lme4"); TRUE }, error = function(e) FALSE)
+              }
+              if (!lme4_ok) {
+                stop("Binary mixed models require lme4 which is not available in this WebR environment. Use a continuous outcome or try logistic regression instead.")
+              }
+              mixed_formula <- as.formula(paste(
+                outcome, "~", paste(preds, collapse = " + "),
+                "+ (1 |", input$random_var, ")"
+              ))
               if (is.factor(df[[outcome]])) {
                 df[[outcome]] <- as.numeric(df[[outcome]]) - 1
               } else if (is.character(df[[outcome]])) {
@@ -945,7 +936,11 @@ model_server <- function(id, shared) {
               }
               lme4::glmer(mixed_formula, data = df, family = binomial)
             } else {
-              lme4::lmer(mixed_formula, data = df)
+              # Continuous outcome: use nlme::lme (base R — always available)
+              fixed_formula <- as.formula(paste(outcome, "~", paste(preds, collapse = " + ")))
+              random_formula <- as.formula(paste("~ 1 |", input$random_var))
+              nlme::lme(fixed = fixed_formula, random = random_formula,
+                        data = df, na.action = na.omit)
             }
           }
         )
@@ -955,21 +950,33 @@ model_server <- function(id, shared) {
         # Tidy results
         if (input$model_type == "lmer") {
           # Manual extraction of fixed effects (broom.mixed not available in WebR)
-          coef_summary <- summary(mod)$coefficients
-          # glmer uses "z value", lmer uses "t value"
-          stat_col <- if ("z value" %in% colnames(coef_summary)) "z value" else "t value"
-          tidy_df <- data.frame(
-            term = rownames(coef_summary),
-            estimate = coef_summary[, "Estimate"],
-            std.error = coef_summary[, "Std. Error"],
-            statistic = coef_summary[, stat_col],
-            stringsAsFactors = FALSE
-          )
-          # p-values: glmer provides them, lmer approximates via normal distribution
-          if ("Pr(>|z|)" %in% colnames(coef_summary)) {
-            tidy_df$p.value <- coef_summary[, "Pr(>|z|)"]
+          if (inherits(mod, "lme")) {
+            # nlme::lme output — tTable has: Value, Std.Error, DF, t-value, p-value
+            coef_summary <- summary(mod)$tTable
+            tidy_df <- data.frame(
+              term = rownames(coef_summary),
+              estimate = coef_summary[, "Value"],
+              std.error = coef_summary[, "Std.Error"],
+              statistic = coef_summary[, "t-value"],
+              p.value = coef_summary[, "p-value"],
+              stringsAsFactors = FALSE
+            )
           } else {
-            tidy_df$p.value <- 2 * pnorm(abs(tidy_df$statistic), lower.tail = FALSE)
+            # lme4 output (glmer) — coefficients has: Estimate, Std. Error, z/t value
+            coef_summary <- summary(mod)$coefficients
+            stat_col <- if ("z value" %in% colnames(coef_summary)) "z value" else "t value"
+            tidy_df <- data.frame(
+              term = rownames(coef_summary),
+              estimate = coef_summary[, "Estimate"],
+              std.error = coef_summary[, "Std. Error"],
+              statistic = coef_summary[, stat_col],
+              stringsAsFactors = FALSE
+            )
+            if ("Pr(>|z|)" %in% colnames(coef_summary)) {
+              tidy_df$p.value <- coef_summary[, "Pr(>|z|)"]
+            } else {
+              tidy_df$p.value <- 2 * pnorm(abs(tidy_df$statistic), lower.tail = FALSE)
+            }
           }
           # Confidence intervals
           tidy_df$conf.low <- tidy_df$estimate - 1.96 * tidy_df$std.error
@@ -978,18 +985,25 @@ model_server <- function(id, shared) {
 
           # Calculate ICC with 95% CI
           tryCatch({
-            vc <- as.data.frame(lme4::VarCorr(mod))
-            if (mixed_model_binary()) {
-              # For binary: ICC = sigma2_u / (sigma2_u + pi^2/3)
-              sigma2_u <- vc$vcov[1]
-              icc_val <- sigma2_u / (sigma2_u + (pi^2 / 3))
-            } else {
-              # For continuous: ICC = sigma2_u / (sigma2_u + sigma2_e)
-              sigma2_u <- vc$vcov[vc$grp != "Residual"][1]
-              sigma2_e <- vc$vcov[vc$grp == "Residual"][1]
+            if (inherits(mod, "lme")) {
+              # nlme::lme — extract variance components
+              vc_raw <- nlme::VarCorr(mod)
+              sigma2_u <- as.numeric(vc_raw[rownames(vc_raw) != "Residual", "Variance"][1])
+              sigma2_e <- as.numeric(vc_raw["Residual", "Variance"])
               icc_val <- sigma2_u / (sigma2_u + sigma2_e)
+            } else {
+              # lme4 — VarCorr returns a data frame
+              vc <- as.data.frame(lme4::VarCorr(mod))
+              if (mixed_model_binary()) {
+                sigma2_u <- vc$vcov[1]
+                icc_val <- sigma2_u / (sigma2_u + (pi^2 / 3))
+              } else {
+                sigma2_u <- vc$vcov[vc$grp != "Residual"][1]
+                sigma2_e <- vc$vcov[vc$grp == "Residual"][1]
+                icc_val <- sigma2_u / (sigma2_u + sigma2_e)
+              }
             }
-            # Bootstrap-style approximate 95% CI using delta method
+            # Approximate 95% CI using delta method
             n_groups <- length(unique(na.omit(df[[input$random_var]])))
             icc_se <- sqrt((2 * (1 - icc_val)^2 * (1 + (n_groups - 1) * icc_val)^2) /
                            (n_groups * (n_groups - 1)))
