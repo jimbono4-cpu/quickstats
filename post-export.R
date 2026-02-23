@@ -2,10 +2,8 @@
 #
 # Three optimizations:
 #   1. Preload hints — start downloading heavy WebR files immediately
-#      instead of waiting for JS module chain to discover them
-#   2. Preloader UI — show animated loading screen while WebR loads
+#   2. Progress bar — shows real download % with status messages
 #   3. Strip unused packages — remove ~120 unneeded bundled packages
-#      to reduce metadata/VFS overhead
 #
 # Usage (from R, with working directory set to repo root):
 #   source("post-export.R")
@@ -18,24 +16,29 @@ if (!file.exists(index)) {
 }
 
 # ============================================================================
-# 1. Patch index.html — preload hints + preloader UI
+# 1. Replace index.html with optimized version
 # ============================================================================
 html <- paste(readLines(index, encoding = "UTF-8"), collapse = "\n")
 
 if (!grepl("app-preloader", html, fixed = TRUE)) {
 
-  # Preload hints: tell browser to start downloading big files IMMEDIATELY
-  # instead of waiting for the JS module waterfall to discover them.
-  # R.bin.wasm (11MB) + library.data.gz (13MB) = 24MB that currently can't
-  # start downloading until shinylive.js is fully parsed.
-  preloads <- '    <!-- Preload heavy WebR assets to eliminate download waterfall -->
-    <link rel="preload" href="./shinylive/shinylive.js" as="script" crossorigin>
+  optimized <- '<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statistical Analysis App</title>
+    <link rel="modulepreload" href="./shinylive/shinylive.js">
     <link rel="preload" href="./shinylive/webr/R.bin.wasm" as="fetch" crossorigin>
     <link rel="preload" href="./shinylive/webr/library.data.gz" as="fetch" crossorigin>
-    <link rel="preload" href="./shinylive/webr/webr-worker.js" as="script" crossorigin>
-    <link rel="preload" href="./shinylive/webr/R.bin.js" as="script" crossorigin>\n'
-
-  css <- '    <style>
+    <script src="./shinylive/load-shinylive-sw.js" type="module"></script>
+    <script type="module">
+      import { runExportedApp } from "./shinylive/shinylive.js";
+      runExportedApp({ id: "root", appEngine: "r", relPath: "" });
+    </script>
+    <link rel="stylesheet" href="./shinylive/style-resets.css" />
+    <link rel="stylesheet" href="./shinylive/shinylive.css" />
+    <style>
       .app-preloader {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         display: flex; flex-direction: column;
@@ -45,51 +48,119 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
         z-index: 9999; transition: opacity 0.5s;
       }
       .app-preloader h1 { font-size: 28px; margin-bottom: 10px; font-weight: 300; }
-      .app-preloader p { font-size: 15px; opacity: 0.85; margin-bottom: 30px; }
+      .app-preloader p { font-size: 15px; opacity: 0.85; }
       .preloader-bar {
-        width: 260px; height: 4px; background: rgba(255,255,255,0.25);
-        border-radius: 2px; overflow: hidden;
+        width: 300px; height: 6px; background: rgba(255,255,255,0.2);
+        border-radius: 3px; overflow: hidden; margin-top: 24px;
       }
       .preloader-bar-fill {
-        height: 100%; width: 30%; background: white; border-radius: 2px;
-        animation: preload-slide 1.5s ease-in-out infinite;
+        height: 100%; width: 0%; background: white; border-radius: 3px;
+        transition: width 0.4s ease;
       }
-      @keyframes preload-slide {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(400%); }
+      .preloader-pct {
+        font-size: 14px; margin-top: 12px; font-weight: 500; opacity: 0.9;
+      }
+      .preloader-status {
+        font-size: 12px; margin-top: 6px; opacity: 0.6;
       }
       .app-preloader.hidden { opacity: 0; pointer-events: none; }
-    </style>\n'
-
-  div <- '    <div class="app-preloader" id="preloader">
+    </style>
+  </head>
+  <body>
+    <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...</p>
-      <div class="preloader-bar"><div class="preloader-bar-fill"></div></div>
-      <p style="font-size:12px; margin-top:20px; opacity:0.6;">First load may take 15-30s. No data leaves your browser.</p>
-    </div>\n'
+      <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
+      <div class="preloader-pct" id="ppct">0%</div>
+      <div class="preloader-status" id="pstatus">Connecting...</div>
+      <p style="font-size:11px; margin-top:24px; opacity:0.45;">No data leaves your browser.</p>
+    </div>
+    <div style="height: 100vh; width: 100vw" id="root"></div>
+    <script>
+    (function() {
+      var files = [
+        { pat: \'shinylive.js\',    sz: 1600000,  lbl: \'Loading runtime...\' },
+        { pat: \'R.bin.wasm\',      sz: 11000000, lbl: \'Downloading R engine...\' },
+        { pat: \'library.data\',    sz: 13000000, lbl: \'Loading R libraries...\' },
+        { pat: \'webr-worker.js\',  sz: 283000,   lbl: \'Starting R worker...\' },
+        { pat: \'R.bin.js\',        sz: 1004000,  lbl: \'Preparing R runtime...\' }
+      ];
+      var totalSz = files.reduce(function(s, f) { return s + f.sz; }, 0);
+      var bar = document.getElementById(\'pbar\');
+      var pctEl = document.getElementById(\'ppct\');
+      var statusEl = document.getElementById(\'pstatus\');
+      var done = false;
+      var smoothPct = 0;
 
-  script <- '    <script>
-      // Hide preloader once Shiny app renders
-      const observer = new MutationObserver(function(mutations) {
-        const root = document.getElementById(\'root\');
+      function check() {
+        if (done) return;
+        var entries = performance.getEntriesByType(\'resource\');
+        var loaded = 0;
+        var currentLbl = \'Initializing R...\';
+        var allFound = true;
+
+        for (var i = 0; i < files.length; i++) {
+          var found = false;
+          for (var j = 0; j < entries.length; j++) {
+            if (entries[j].name.indexOf(files[i].pat) !== -1 && entries[j].responseEnd > 0) {
+              loaded += files[i].sz;
+              found = true;
+              break;
+            }
+          }
+          if (!found && allFound) {
+            currentLbl = files[i].lbl;
+            allFound = false;
+          }
+        }
+
+        var rawPct = Math.min(90, Math.round(100 * loaded / totalSz));
+        if (rawPct > smoothPct) {
+          smoothPct += Math.max(1, Math.round((rawPct - smoothPct) / 3));
+          if (smoothPct > rawPct) smoothPct = rawPct;
+        } else if (smoothPct < 5) {
+          smoothPct += 0.3;
+        }
+
+        if (allFound && smoothPct >= 85) {
+          currentLbl = \'Starting Shiny app...\';
+          smoothPct = 92;
+        }
+
+        if (bar) bar.style.width = Math.round(smoothPct) + \'%\';
+        if (pctEl) pctEl.textContent = Math.round(smoothPct) + \'%\';
+        if (statusEl) statusEl.textContent = currentLbl;
+
+        setTimeout(check, 250);
+      }
+
+      setTimeout(check, 300);
+
+      var obs = new MutationObserver(function() {
+        var root = document.getElementById(\'root\');
         if (root && root.children.length > 0) {
-          const pre = document.getElementById(\'preloader\');
-          if (pre) { pre.classList.add(\'hidden\'); setTimeout(() => pre.remove(), 600); }
-          observer.disconnect();
+          done = true;
+          if (bar) bar.style.width = \'100%\';
+          if (pctEl) pctEl.textContent = \'100%\';
+          if (statusEl) statusEl.textContent = \'Ready!\';
+          var pre = document.getElementById(\'preloader\');
+          if (pre) {
+            setTimeout(function() {
+              pre.classList.add(\'hidden\');
+              setTimeout(function() { pre.remove(); }, 600);
+            }, 400);
+          }
+          obs.disconnect();
         }
       });
-      observer.observe(document.getElementById(\'root\'), { childList: true, subtree: true });
-    </script>\n'
+      obs.observe(document.getElementById(\'root\'), { childList: true, subtree: true });
+    })();
+    </script>
+  </body>
+</html>'
 
-  # Inject preloads + CSS before </head>
-  html <- sub("</head>", paste0(preloads, css, "  </head>"), html, fixed = TRUE)
-  # Inject preloader div after <body>
-  html <- sub("<body>", paste0("<body>\n", div), html, fixed = TRUE)
-  # Inject MutationObserver script before </body>
-  html <- sub("</body>", paste0(script, "  </body>"), html, fixed = TRUE)
-
-  writeLines(html, index, useBytes = FALSE)
-  message("OK: Preloader + preload hints injected into ", index)
+  writeLines(optimized, index, useBytes = FALSE)
+  message("OK: Optimized index.html with progress bar + preload hints")
 } else {
   message("Preloader already present in ", index, " — skipping HTML patch.")
 }
@@ -97,11 +168,6 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
 # ============================================================================
 # 2. Strip unused bundled packages (164MB -> ~60MB)
 # ============================================================================
-# Shinylive statically detects all package references and bundles them,
-# including packages we don't use (ggdag, gt, DT, forecast, etc.).
-# Keep only packages our app actually needs + their dependencies.
-# Anything removed here will be fetched from the WebR CDN if ever needed.
-
 keep_packages <- c(
   # Our app's direct dependencies
   "haven", "readxl", "labelled", "munsell", "ggplot2", "broom",
