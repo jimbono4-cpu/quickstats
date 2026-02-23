@@ -125,6 +125,8 @@ prepare_model_data <- function(df, var_types) {
 }
 
 #' Safe file reader — detects format from extension
+#' Installs haven/readxl on-demand if not yet available (background install
+#' may still be running when user uploads a non-CSV file).
 safe_read_data <- function(file_path, file_name) {
   ext <- tolower(tools::file_ext(file_name))
   tryCatch({
@@ -132,29 +134,24 @@ safe_read_data <- function(file_path, file_name) {
       "csv" = read.csv(file_path, stringsAsFactors = FALSE),
       "tsv" = read.delim(file_path, stringsAsFactors = FALSE),
       "xlsx" = {
-        if (requireNamespace("readxl", quietly = TRUE))
-          as.data.frame(readxl::read_xlsx(file_path))
-        else stop("readxl not available")
+        install_if_needed("readxl")
+        as.data.frame(readxl::read_xlsx(file_path))
       },
       "xls" = {
-        if (requireNamespace("readxl", quietly = TRUE))
-          as.data.frame(readxl::read_xls(file_path))
-        else stop("readxl not available")
+        install_if_needed("readxl")
+        as.data.frame(readxl::read_xls(file_path))
       },
       "dta" = {
-        if (requireNamespace("haven", quietly = TRUE))
-          as.data.frame(haven::read_dta(file_path))
-        else stop("haven not available")
+        install_if_needed("haven")
+        as.data.frame(haven::read_dta(file_path))
       },
       "sav" = {
-        if (requireNamespace("haven", quietly = TRUE))
-          as.data.frame(haven::read_sav(file_path))
-        else stop("haven not available")
+        install_if_needed("haven")
+        as.data.frame(haven::read_sav(file_path))
       },
       "sas7bdat" = {
-        if (requireNamespace("haven", quietly = TRUE))
-          as.data.frame(haven::read_sas(file_path))
-        else stop("haven not available")
+        install_if_needed("haven")
+        as.data.frame(haven::read_sas(file_path))
       },
       stop(paste("Unsupported file format:", ext))
     )
@@ -3097,54 +3094,33 @@ server <- function(input, output, session) {
     diagnostics_plot = NULL,
     diagnostics_plot_base64 = NULL,
     last_export = NULL,
-    packages_ready = FALSE,
+    packages_ready = TRUE,
     modeling_ready = FALSE
   )
 
-  # --- Package installation with progress ------------------------------------
-  # Phase 1: Install ESSENTIAL packages only (Steps 1-2) — fast startup
+  # --- Package installation -----------------------------------------------------
+  # ZERO packages installed at startup — app shows immediately.
+  # Phase 1: Background install ALL packages via later() so UI is responsive.
+  # Phase 2: On-demand install for haven/readxl if user uploads non-CSV before
+  #           background install finishes (handled in safe_read_data via
+  #           install_if_needed).
   observe({
-    essential_pkgs <- c("haven", "readxl", "labelled")
-    total <- length(essential_pkgs)
-
-    for (i in seq_along(essential_pkgs)) {
-      pct <- round(100 * i / total)
-      session$sendCustomMessage("updateLoadingProgress", list(
-        pct = pct,
-        message = paste0("Installing ", essential_pkgs[i], " (", i, "/", total, ") ... ", pct, "%")
-      ))
-      install_if_needed(essential_pkgs[i])
-    }
-
-    session$sendCustomMessage("updateLoadingProgress", list(
-      pct = 100,
-      message = "Ready! Loading additional packages in background..."
-    ))
     session$sendCustomMessage("hideLoadingOverlay", list())
-    shared$packages_ready <- TRUE
-  }) |> bindEvent(TRUE, once = TRUE)
 
-  # Phase 2: Install DEFERRED packages AFTER UI has flushed
-  # Using later() to break the synchronous chain — without this,
-  # Phase 2 fires before hideLoadingOverlay reaches the browser.
-  observe({
-    req(shared$packages_ready)
-
-    deferred_pkgs <- c("munsell", "ggplot2", "broom",
-                       "survival", "sandwich", "lmtest", "car", "emmeans",
-                       "writexl", "lme4", "gridExtra", "base64enc")
-
-    # Schedule deferred install after a short delay so the overlay
-    # hide message flushes to the browser first
+    # Install all packages in background after UI renders
     later::later(function() {
-      for (pkg in deferred_pkgs) {
+      all_pkgs <- c("haven", "readxl", "labelled",
+                     "munsell", "ggplot2", "broom",
+                     "survival", "sandwich", "lmtest", "car", "emmeans",
+                     "writexl", "lme4", "gridExtra", "base64enc")
+      for (pkg in all_pkgs) {
         install_if_needed(pkg)
       }
       # Force-load ggplot2 into the namespace
       tryCatch(library(ggplot2), error = function(e) NULL)
       shared$modeling_ready <- TRUE
-    }, delay = 0.5)
-  }) |> bindEvent(shared$packages_ready, once = TRUE)
+    }, delay = 0.1)
+  }) |> bindEvent(TRUE, once = TRUE)
 
   # Current step tracker
   current_step <- reactiveVal(1)
