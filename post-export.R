@@ -177,22 +177,31 @@ message("OK: Optimized index.html written (progress bar + preload hints)")
 # 2. Strip unused bundled packages (164MB -> ~60MB)
 # ============================================================================
 keep_packages <- c(
+  # App packages
   "haven", "readxl", "labelled", "munsell", "ggplot2", "broom",
   "survival", "sandwich", "lmtest", "car", "emmeans", "writexl",
   "lme4", "gridExtra", "base64enc",
+  # ggplot2 deps
   "scales", "gtable", "isoband", "farver", "labeling", "colorspace",
-  "viridisLite", "RColorBrewer",
+  "viridisLite", "RColorBrewer", "withr",
+  # tidyverse core deps
   "dplyr", "tidyr", "tibble", "purrr", "vctrs", "tidyselect",
   "pillar", "generics", "stringr", "stringi", "forcats",
+  # Common infrastructure deps (often required by many packages)
+  "pkgconfig", "R6", "cli", "rlang", "lifecycle", "glue",
+  "fansi", "utf8", "magrittr", "Rcpp", "digest", "cpp11",
+  # car / emmeans / lme4 deps
   "carData", "abind", "Formula", "pbkrtest", "nnet",
   "SparseM", "MatrixModels", "Deriv", "quantreg",
   "Matrix", "minqa", "nloptr", "reformulas", "boot", "nlme",
   "lattice", "MASS",
   "estimability", "mvtnorm", "numDeriv",
+  # readxl / haven deps
   "cellranger", "readr", "hms", "bit64", "bit", "vroom", "tzdb",
   "clipr", "crayon",
   "zoo",
   "backports", "mgcv", "foreign",
+  # Shinylive/WebR infrastructure
   "shinylive", "webr",
   "metadata.rds"
 )

@@ -590,6 +590,15 @@ table1_server <- function(id, shared) {
         n_total <- nrow(df_sub)
         rows <- list()
 
+        # Column names with N counts
+        group_col_names <- NULL
+        group_n <- NULL
+        if (!is.null(groups)) {
+          group_n <- sapply(groups, function(g) sum(df_sub[[by_var]] == g, na.rm = TRUE))
+          group_col_names <- paste0(by_var, ": ", groups, " (N=", group_n, ")")
+        }
+        overall_col_name <- paste0("Overall (N=", n_total, ")")
+
         for (v in analysis_vars) {
           is_cat <- is.factor(df_sub[[v]]) || is.character(df_sub[[v]]) ||
                     (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
@@ -599,24 +608,25 @@ table1_server <- function(id, shared) {
             # Header row for this variable
             row <- list(Variable = paste0("**", v, "**"), Statistic = "n (%)")
             if (!is.null(groups)) {
-              for (g in groups) row[[paste0(by_var, ": ", g)]] <- ""
+              for (gi in seq_along(groups)) row[[group_col_names[gi]]] <- ""
             }
-            row[["Overall"]] <- ""
+            row[[overall_col_name]] <- ""
             rows <- c(rows, list(row))
             # Level rows
             for (lv in lvls) {
               row <- list(Variable = paste0("    ", lv), Statistic = "")
               if (!is.null(groups)) {
-                for (g in groups) {
+                for (gi in seq_along(groups)) {
+                  g <- groups[gi]
                   sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
                   n_lv <- sum(sub[[v]] == lv, na.rm = TRUE)
                   pct <- round(100 * n_lv / nrow(sub), 1)
-                  row[[paste0(by_var, ": ", g)]] <- paste0(n_lv, " (", pct, "%)")
+                  row[[group_col_names[gi]]] <- paste0(n_lv, " (", pct, "%)")
                 }
               }
               n_lv_all <- sum(df_sub[[v]] == lv, na.rm = TRUE)
               pct_all <- round(100 * n_lv_all / n_total, 1)
-              row[["Overall"]] <- paste0(n_lv_all, " (", pct_all, "%)")
+              row[[overall_col_name]] <- paste0(n_lv_all, " (", pct_all, "%)")
               rows <- c(rows, list(row))
             }
             # p-value row for categorical
@@ -643,12 +653,13 @@ table1_server <- function(id, shared) {
               }
             }
             if (!is.null(groups)) {
-              for (g in groups) {
+              for (gi in seq_along(groups)) {
+                g <- groups[gi]
                 sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
-                row[[paste0(by_var, ": ", g)]] <- fmt_stat(sub[[v]])
+                row[[group_col_names[gi]]] <- fmt_stat(sub[[v]])
               }
             }
-            row[["Overall"]] <- fmt_stat(df_sub[[v]])
+            row[[overall_col_name]] <- fmt_stat(df_sub[[v]])
             # p-value
             if (input$add_p && !is.null(by_var)) {
               p_val <- tryCatch({
@@ -678,7 +689,7 @@ table1_server <- function(id, shared) {
         names(tbl_df) <- all_cols
         # Remove Overall column only if stratified and user didn't request it
         if (!is.null(by_var) && !input$add_overall) {
-          tbl_df <- tbl_df[, names(tbl_df) != "Overall", drop = FALSE]
+          tbl_df <- tbl_df[, !grepl("^Overall", names(tbl_df)), drop = FALSE]
         }
         # Remove p-value column if not requested
         if (!input$add_p || is.null(by_var)) {
