@@ -94,9 +94,6 @@
 
       requestAnimationFrame(tick);
 
-      // Poll for the actual Shiny app UI — the #next_step button only
-      // exists once the real app has fully rendered (not just Shinylive's
-      // container which appears in seconds).
       function checkShinyReady() {
         if (done) return;
         var btn = document.getElementById('next_step');
