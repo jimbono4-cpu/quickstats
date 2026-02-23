@@ -906,11 +906,25 @@ model_server <- function(id, shared) {
           },
           "lmer" = {
             req(input$random_var)
-            # lme4 needs compiled deps — install them explicitly first
-            for (dep in c("RcppEigen", "minqa", "nloptr", "reformulas", "lme4")) {
-              install_if_needed(dep)
+            # lme4 needs compiled deps — force install each one explicitly
+            lme4_deps <- c("Rcpp", "RcppEigen", "Matrix", "minqa", "nloptr",
+                           "nlme", "reformulas", "lme4")
+            for (dep in lme4_deps) {
+              if (!requireNamespace(dep, quietly = TRUE)) {
+                tryCatch(
+                  webr::install(dep),
+                  error = function(e) NULL
+                )
+              }
             }
-            if (!requireNamespace("lme4", quietly = TRUE)) stop("lme4 not available — please wait for packages to finish loading and try again")
+            # Final attempt: try loading lme4 and report the actual error if it fails
+            load_err <- tryCatch({
+              loadNamespace("lme4")
+              NULL
+            }, error = function(e) conditionMessage(e))
+            if (!is.null(load_err)) {
+              stop(paste("Mixed models require lme4. Load error:", load_err))
+            }
             mixed_formula <- as.formula(paste(
               outcome, "~", paste(preds, collapse = " + "),
               "+ (1 |", input$random_var, ")"
