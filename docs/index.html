@@ -15,17 +15,18 @@
     <link rel="stylesheet" href="./shinylive/style-resets.css" />
     <link rel="stylesheet" href="./shinylive/shinylive.css" />
     <style>
-      /* Suppress Shinylive's built-in loading screen (hex spinner on white bg) */
+      /* Suppress Shinylive built-in loading screen (hex spinner on white bg) */
       .shinylive-viewer .loading-wrapper {
         display: none !important;
       }
+      /* Our preloader: max z-index, fully opaque, covers everything */
       .app-preloader {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         display: flex !important; flex-direction: column;
         align-items: center; justify-content: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white; font-family: 'Segoe UI', Tahoma, sans-serif;
-        z-index: 2147483647;
+        color: white; font-family: "Segoe UI", Tahoma, sans-serif;
+        z-index: 2147483647; /* max 32-bit int — on top of everything */
         transition: opacity 0.5s;
       }
       .app-preloader h1 { font-size: 28px; margin-bottom: 10px; font-weight: 300; }
@@ -49,6 +50,7 @@
   </head>
   <body>
     <div style="height: 100vh; width: 100vw" id="root"></div>
+    <!-- Preloader AFTER #root so it paints on top in document order -->
     <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...</p>
@@ -59,20 +61,20 @@
     </div>
     <script>
     (function() {
-      var bar = document.getElementById('pbar');
-      var pctEl = document.getElementById('ppct');
-      var statusEl = document.getElementById('pstatus');
+      var bar = document.getElementById("pbar");
+      var pctEl = document.getElementById("ppct");
+      var statusEl = document.getElementById("pstatus");
       var done = false;
       var startTime = Date.now();
       var expectedMs = 25000;
 
       var stages = [
-        { at: 0,  lbl: 'Connecting...' },
-        { at: 8,  lbl: 'Downloading R engine...' },
-        { at: 30, lbl: 'Loading R libraries...' },
-        { at: 55, lbl: 'Compiling WebAssembly...' },
-        { at: 75, lbl: 'Starting R worker...' },
-        { at: 88, lbl: 'Initializing Shiny app...' }
+        { at: 0,  lbl: "Connecting..." },
+        { at: 8,  lbl: "Downloading R engine..." },
+        { at: 30, lbl: "Loading R libraries..." },
+        { at: 55, lbl: "Compiling WebAssembly..." },
+        { at: 75, lbl: "Starting R worker..." },
+        { at: 88, lbl: "Initializing Shiny app..." }
       ];
 
       function getStageLabel(pct) {
@@ -90,8 +92,8 @@
         var pct = Math.round(92 * (1 - Math.pow(1 - t, 2.5)));
         if (pct > 92) pct = 92;
 
-        if (bar) bar.style.width = pct + '%';
-        if (pctEl) pctEl.textContent = pct + '%';
+        if (bar) bar.style.width = pct + "%";
+        if (pctEl) pctEl.textContent = pct + "%";
         if (statusEl) statusEl.textContent = getStageLabel(pct);
 
         requestAnimationFrame(tick);
@@ -103,16 +105,16 @@
          has fully rendered, not when Shinylive shows its hex spinner */
       function checkShinyReady() {
         if (done) return;
-        var btn = document.getElementById('next_step');
+        var btn = document.getElementById("next_step");
         if (btn) {
           done = true;
-          if (bar) bar.style.width = '100%';
-          if (pctEl) pctEl.textContent = '100%';
-          if (statusEl) statusEl.textContent = 'Ready!';
-          var pre = document.getElementById('preloader');
+          if (bar) bar.style.width = "100%";
+          if (pctEl) pctEl.textContent = "100%";
+          if (statusEl) statusEl.textContent = "Ready!";
+          var pre = document.getElementById("preloader");
           if (pre) {
             setTimeout(function() {
-              pre.classList.add('hidden');
+              pre.classList.add("hidden");
               setTimeout(function() { pre.remove(); }, 600);
             }, 400);
           }
