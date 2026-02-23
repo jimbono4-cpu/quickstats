@@ -193,7 +193,7 @@ keep_packages <- c(
   # car / emmeans / lme4 deps
   "carData", "abind", "Formula", "pbkrtest", "nnet",
   "SparseM", "MatrixModels", "Deriv", "quantreg",
-  "Matrix", "minqa", "nloptr", "reformulas", "boot", "nlme",
+  "Matrix", "minqa", "nloptr", "RcppEigen", "reformulas", "boot", "nlme",
   "lattice", "MASS",
   "estimability", "mvtnorm", "numDeriv",
   # readxl / haven deps

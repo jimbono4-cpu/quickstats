@@ -906,7 +906,10 @@ model_server <- function(id, shared) {
           },
           "lmer" = {
             req(input$random_var)
-            install_if_needed("lme4")
+            # lme4 needs compiled deps — install them explicitly first
+            for (dep in c("RcppEigen", "minqa", "nloptr", "reformulas", "lme4")) {
+              install_if_needed(dep)
+            }
             if (!requireNamespace("lme4", quietly = TRUE)) stop("lme4 not available — please wait for packages to finish loading and try again")
             mixed_formula <- as.formula(paste(
               outcome, "~", paste(preds, collapse = " + "),
