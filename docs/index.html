@@ -54,64 +54,49 @@
     <div style="height: 100vh; width: 100vw" id="root"></div>
     <script>
     (function() {
-      var files = [
-        { pat: 'shinylive.js',    sz: 1600000,  lbl: 'Loading runtime...' },
-        { pat: 'R.bin.wasm',      sz: 11000000, lbl: 'Downloading R engine...' },
-        { pat: 'library.data',    sz: 13000000, lbl: 'Loading R libraries...' },
-        { pat: 'webr-worker.js',  sz: 283000,   lbl: 'Starting R worker...' },
-        { pat: 'R.bin.js',        sz: 1004000,  lbl: 'Preparing R runtime...' }
-      ];
-      var totalSz = files.reduce(function(s, f) { return s + f.sz; }, 0);
       var bar = document.getElementById('pbar');
       var pctEl = document.getElementById('ppct');
       var statusEl = document.getElementById('pstatus');
       var done = false;
-      var smoothPct = 0;
+      var startTime = Date.now();
+      // Estimated load ~25s first visit, ~10s cached
+      var expectedMs = 25000;
 
-      function check() {
-        if (done) return;
-        var entries = performance.getEntriesByType('resource');
-        var loaded = 0;
-        var currentLbl = 'Initializing R...';
-        var allFound = true;
+      var stages = [
+        { at: 0,  lbl: 'Connecting...' },
+        { at: 8,  lbl: 'Downloading R engine...' },
+        { at: 30, lbl: 'Loading R libraries...' },
+        { at: 55, lbl: 'Compiling WebAssembly...' },
+        { at: 75, lbl: 'Starting R worker...' },
+        { at: 88, lbl: 'Initializing Shiny app...' }
+      ];
 
-        for (var i = 0; i < files.length; i++) {
-          var found = false;
-          for (var j = 0; j < entries.length; j++) {
-            if (entries[j].name.indexOf(files[i].pat) !== -1 && entries[j].responseEnd > 0) {
-              loaded += files[i].sz;
-              found = true;
-              break;
-            }
-          }
-          if (!found && allFound) {
-            currentLbl = files[i].lbl;
-            allFound = false;
-          }
+      function getStageLabel(pct) {
+        var lbl = stages[0].lbl;
+        for (var i = 0; i < stages.length; i++) {
+          if (pct >= stages[i].at) lbl = stages[i].lbl;
         }
-
-        var rawPct = Math.min(90, Math.round(100 * loaded / totalSz));
-        if (rawPct > smoothPct) {
-          smoothPct += Math.max(1, Math.round((rawPct - smoothPct) / 3));
-          if (smoothPct > rawPct) smoothPct = rawPct;
-        } else if (smoothPct < 5) {
-          smoothPct += 0.3;
-        }
-
-        if (allFound && smoothPct >= 85) {
-          currentLbl = 'Starting Shiny app...';
-          smoothPct = 92;
-        }
-
-        if (bar) bar.style.width = Math.round(smoothPct) + '%';
-        if (pctEl) pctEl.textContent = Math.round(smoothPct) + '%';
-        if (statusEl) statusEl.textContent = currentLbl;
-
-        setTimeout(check, 250);
+        return lbl;
       }
 
-      setTimeout(check, 300);
+      function tick() {
+        if (done) return;
+        var elapsed = Date.now() - startTime;
+        // Ease-out curve: fast at start, slows approaching 92%
+        var t = Math.min(elapsed / expectedMs, 1);
+        var pct = Math.round(92 * (1 - Math.pow(1 - t, 2.5)));
+        if (pct > 92) pct = 92;
 
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (statusEl) statusEl.textContent = getStageLabel(pct);
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+
+      // When Shiny app renders: snap to 100% then fade out
       var obs = new MutationObserver(function() {
         var root = document.getElementById('root');
         if (root && root.children.length > 0) {
