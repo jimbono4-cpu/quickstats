@@ -906,7 +906,8 @@ model_server <- function(id, shared) {
           },
           "lmer" = {
             req(input$random_var)
-            if (!requireNamespace("lme4", quietly = TRUE)) stop("lme4 not available")
+            install_if_needed("lme4")
+            if (!requireNamespace("lme4", quietly = TRUE)) stop("lme4 not available — please wait for packages to finish loading and try again")
             mixed_formula <- as.formula(paste(
               outcome, "~", paste(preds, collapse = " + "),
               "+ (1 |", input$random_var, ")"
