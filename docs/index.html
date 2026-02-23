@@ -27,7 +27,7 @@
         align-items: center; justify-content: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; font-family: "Segoe UI", Tahoma, sans-serif;
-        z-index: 2147483647;
+        z-index: 2147483647; /* max 32-bit int — on top of everything */
         transition: opacity 0.5s;
       }
       .app-preloader h1 { font-size: 28px; margin-bottom: 10px; font-weight: 300; }
@@ -105,7 +105,7 @@
       /* Detect when Shinylive finishes loading:
          Shinylive removes .loading-wrapper from the DOM once the app iframe
          is ready. We also check for an iframe with content as a fallback.
-         NOTE: #next_step is inside an iframe so getElementById can't reach it. */
+         NOTE: #next_step is inside an iframe so getElementById cannot reach it. */
       function dismissPreloader() {
         if (done) return;
         done = true;
