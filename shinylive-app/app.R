@@ -3120,6 +3120,14 @@ server <- function(input, output, session) {
 
     # Install all packages in background after UI renders
     later::later(function() {
+      # Infrastructure deps first (needed by top-level packages)
+      infra_pkgs <- c("pkgconfig", "R6", "cli", "rlang", "lifecycle",
+                       "glue", "fansi", "utf8", "magrittr", "withr",
+                       "Rcpp", "digest")
+      for (pkg in infra_pkgs) {
+        install_if_needed(pkg)
+      }
+      # Top-level app packages
       all_pkgs <- c("haven", "readxl", "labelled",
                      "munsell", "ggplot2", "broom",
                      "survival", "sandwich", "lmtest", "car", "emmeans",
