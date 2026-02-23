@@ -4,8 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Statistical Analysis App</title>
-    <!-- Preload the 3 biggest files so downloads start immediately,
-         not after the JS module chain discovers them -->
     <link rel="modulepreload" href="./shinylive/shinylive.js">
     <link rel="preload" href="./shinylive/webr/R.bin.wasm" as="fetch" crossorigin>
     <link rel="preload" href="./shinylive/webr/library.data.gz" as="fetch" crossorigin>
@@ -56,7 +54,6 @@
     <div style="height: 100vh; width: 100vw" id="root"></div>
     <script>
     (function() {
-      // Track download progress of the big WebR files
       var files = [
         { pat: 'shinylive.js',    sz: 1600000,  lbl: 'Loading runtime...' },
         { pat: 'R.bin.wasm',      sz: 11000000, lbl: 'Downloading R engine...' },
@@ -94,12 +91,10 @@
         }
 
         var rawPct = Math.min(90, Math.round(100 * loaded / totalSz));
-        // Smooth: never go backwards, increment gradually
         if (rawPct > smoothPct) {
           smoothPct += Math.max(1, Math.round((rawPct - smoothPct) / 3));
           if (smoothPct > rawPct) smoothPct = rawPct;
         } else if (smoothPct < 5) {
-          // Trickle up slowly while waiting for first file
           smoothPct += 0.3;
         }
 
@@ -117,7 +112,6 @@
 
       setTimeout(check, 300);
 
-      // When Shiny app renders: animate to 100% then fade out
       var obs = new MutationObserver(function() {
         var root = document.getElementById('root');
         if (root && root.children.length > 0) {
