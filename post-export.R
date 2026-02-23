@@ -87,15 +87,15 @@ optimized <- '<!doctype html>
       var statusEl = document.getElementById(\"pstatus\");
       var done = false;
       var startTime = Date.now();
-      var expectedMs = 25000;
+      var expectedMs = 45000;
 
       var stages = [
         { at: 0,  lbl: \"Connecting...\" },
-        { at: 8,  lbl: \"Downloading R engine...\" },
-        { at: 30, lbl: \"Loading R libraries...\" },
-        { at: 55, lbl: \"Compiling WebAssembly...\" },
-        { at: 75, lbl: \"Starting R worker...\" },
-        { at: 88, lbl: \"Initializing Shiny app...\" }
+        { at: 5,  lbl: \"Downloading R engine...\" },
+        { at: 20, lbl: \"Loading R libraries...\" },
+        { at: 45, lbl: \"Compiling WebAssembly...\" },
+        { at: 65, lbl: \"Starting R worker...\" },
+        { at: 85, lbl: \"Initializing Shiny app...\" }
       ];
 
       function getStageLabel(pct) {
@@ -110,8 +110,8 @@ optimized <- '<!doctype html>
         if (done) return;
         var elapsed = Date.now() - startTime;
         var t = Math.min(elapsed / expectedMs, 1);
-        var pct = Math.round(92 * (1 - Math.pow(1 - t, 2.5)));
-        if (pct > 92) pct = 92;
+        var pct = Math.round(99 * (1 - Math.pow(1 - t, 1.8)));
+        if (pct > 99) pct = 99;
 
         if (bar) bar.style.width = pct + \"%\";
         if (pctEl) pctEl.textContent = pct + \"%\";
