@@ -21,7 +21,8 @@
         align-items: center; justify-content: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; font-family: 'Segoe UI', Tahoma, sans-serif;
-        z-index: 9999; transition: opacity 0.5s;
+        z-index: 2147483647;
+        transition: opacity 0.5s;
       }
       .app-preloader h1 { font-size: 28px; margin-bottom: 10px; font-weight: 300; }
       .app-preloader p { font-size: 15px; opacity: 0.85; }
@@ -43,6 +44,7 @@
     </style>
   </head>
   <body>
+    <div style="height: 100vh; width: 100vw" id="root"></div>
     <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...</p>
@@ -51,7 +53,6 @@
       <div class="preloader-status" id="pstatus">Connecting...</div>
       <p style="font-size:11px; margin-top:24px; opacity:0.45;">No data leaves your browser.</p>
     </div>
-    <div style="height: 100vh; width: 100vw" id="root"></div>
     <script>
     (function() {
       var bar = document.getElementById('pbar');
@@ -94,6 +95,8 @@
 
       requestAnimationFrame(tick);
 
+      /* Poll for #next_step button — only exists when the real Shiny app
+         has fully rendered, not when Shinylive shows its hex spinner */
       function checkShinyReady() {
         if (done) return;
         var btn = document.getElementById('next_step');

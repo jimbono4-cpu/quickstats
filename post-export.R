@@ -1,9 +1,9 @@
 # post-export.R — Run AFTER shinylive::export("shinylive-app", "docs")
 #
 # Three optimizations:
-#   1. Preload hints — start downloading heavy WebR files immediately
-#   2. Progress bar — shows real download % with status messages
-#   3. Strip unused packages — remove ~120 unneeded bundled packages
+#   1. Replaces index.html with version that has preload hints + progress bar
+#   2. Progress bar stays visible until actual Shiny app renders
+#   3. Strips unused packages to reduce download size
 #
 # Usage (from R, with working directory set to repo root):
 #   source("post-export.R")
@@ -16,13 +16,9 @@ if (!file.exists(index)) {
 }
 
 # ============================================================================
-# 1. Replace index.html with optimized version
+# 1. ALWAYS overwrite index.html with optimized version
 # ============================================================================
-html <- paste(readLines(index, encoding = "UTF-8"), collapse = "\n")
-
-if (!grepl("app-preloader", html, fixed = TRUE)) {
-
-  optimized <- '<!doctype html>
+optimized <- '<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -39,13 +35,15 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
     <link rel="stylesheet" href="./shinylive/style-resets.css" />
     <link rel="stylesheet" href="./shinylive/shinylive.css" />
     <style>
+      /* Our preloader: max z-index, fully opaque, covers everything */
       .app-preloader {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         display: flex; flex-direction: column;
         align-items: center; justify-content: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white; font-family: \'Segoe UI\', Tahoma, sans-serif;
-        z-index: 9999; transition: opacity 0.5s;
+        color: white; font-family: \"Segoe UI\", Tahoma, sans-serif;
+        z-index: 2147483647; /* max 32-bit int — on top of everything */
+        transition: opacity 0.5s;
       }
       .app-preloader h1 { font-size: 28px; margin-bottom: 10px; font-weight: 300; }
       .app-preloader p { font-size: 15px; opacity: 0.85; }
@@ -67,6 +65,8 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
     </style>
   </head>
   <body>
+    <div style="height: 100vh; width: 100vw" id="root"></div>
+    <!-- Preloader AFTER #root so it paints on top in document order -->
     <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...</p>
@@ -75,23 +75,22 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
       <div class="preloader-status" id="pstatus">Connecting...</div>
       <p style="font-size:11px; margin-top:24px; opacity:0.45;">No data leaves your browser.</p>
     </div>
-    <div style="height: 100vh; width: 100vw" id="root"></div>
     <script>
     (function() {
-      var bar = document.getElementById(\'pbar\');
-      var pctEl = document.getElementById(\'ppct\');
-      var statusEl = document.getElementById(\'pstatus\');
+      var bar = document.getElementById(\"pbar\");
+      var pctEl = document.getElementById(\"ppct\");
+      var statusEl = document.getElementById(\"pstatus\");
       var done = false;
       var startTime = Date.now();
       var expectedMs = 25000;
 
       var stages = [
-        { at: 0,  lbl: \'Connecting...\' },
-        { at: 8,  lbl: \'Downloading R engine...\' },
-        { at: 30, lbl: \'Loading R libraries...\' },
-        { at: 55, lbl: \'Compiling WebAssembly...\' },
-        { at: 75, lbl: \'Starting R worker...\' },
-        { at: 88, lbl: \'Initializing Shiny app...\' }
+        { at: 0,  lbl: \"Connecting...\" },
+        { at: 8,  lbl: \"Downloading R engine...\" },
+        { at: 30, lbl: \"Loading R libraries...\" },
+        { at: 55, lbl: \"Compiling WebAssembly...\" },
+        { at: 75, lbl: \"Starting R worker...\" },
+        { at: 88, lbl: \"Initializing Shiny app...\" }
       ];
 
       function getStageLabel(pct) {
@@ -109,8 +108,8 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
         var pct = Math.round(92 * (1 - Math.pow(1 - t, 2.5)));
         if (pct > 92) pct = 92;
 
-        if (bar) bar.style.width = pct + \'%\';
-        if (pctEl) pctEl.textContent = pct + \'%\';
+        if (bar) bar.style.width = pct + \"%\";
+        if (pctEl) pctEl.textContent = pct + \"%\";
         if (statusEl) statusEl.textContent = getStageLabel(pct);
 
         requestAnimationFrame(tick);
@@ -118,18 +117,20 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
 
       requestAnimationFrame(tick);
 
+      /* Poll for #next_step button — only exists when the real Shiny app
+         has fully rendered, not when Shinylive shows its hex spinner */
       function checkShinyReady() {
         if (done) return;
-        var btn = document.getElementById(\'next_step\');
+        var btn = document.getElementById(\"next_step\");
         if (btn) {
           done = true;
-          if (bar) bar.style.width = \'100%\';
-          if (pctEl) pctEl.textContent = \'100%\';
-          if (statusEl) statusEl.textContent = \'Ready!\';
-          var pre = document.getElementById(\'preloader\');
+          if (bar) bar.style.width = \"100%\";
+          if (pctEl) pctEl.textContent = \"100%\";
+          if (statusEl) statusEl.textContent = \"Ready!\";
+          var pre = document.getElementById(\"preloader\");
           if (pre) {
             setTimeout(function() {
-              pre.classList.add(\'hidden\');
+              pre.classList.add(\"hidden\");
               setTimeout(function() { pre.remove(); }, 600);
             }, 400);
           }
@@ -143,44 +144,30 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
   </body>
 </html>'
 
-  writeLines(optimized, index, useBytes = FALSE)
-  message("OK: Optimized index.html with progress bar + preload hints")
-} else {
-  message("Preloader already present in ", index, " — skipping HTML patch.")
-}
+writeLines(optimized, index, useBytes = FALSE)
+message("OK: Optimized index.html written (progress bar + preload hints)")
 
 # ============================================================================
 # 2. Strip unused bundled packages (164MB -> ~60MB)
 # ============================================================================
 keep_packages <- c(
-  # Our app's direct dependencies
   "haven", "readxl", "labelled", "munsell", "ggplot2", "broom",
   "survival", "sandwich", "lmtest", "car", "emmeans", "writexl",
   "lme4", "gridExtra", "base64enc",
-  # ggplot2 dependency tree
   "scales", "gtable", "isoband", "farver", "labeling", "colorspace",
   "viridisLite", "RColorBrewer",
-  # tidyverse core (used by broom, labelled, haven, dplyr, tidyr)
   "dplyr", "tidyr", "tibble", "purrr", "vctrs", "tidyselect",
   "pillar", "generics", "stringr", "stringi", "forcats",
-  # car dependency tree
   "carData", "abind", "Formula", "pbkrtest", "nnet",
   "SparseM", "MatrixModels", "Deriv", "quantreg",
-  # lme4 dependency tree
   "Matrix", "minqa", "nloptr", "reformulas", "boot", "nlme",
   "lattice", "MASS",
-  # emmeans dependencies
   "estimability", "mvtnorm", "numDeriv",
-  # haven/readxl dependencies
   "cellranger", "readr", "hms", "bit64", "bit", "vroom", "tzdb",
   "clipr", "crayon",
-  # sandwich/lmtest
   "zoo",
-  # Misc shared dependencies
   "backports", "mgcv", "foreign",
-  # shinylive/webr infrastructure (DO NOT remove)
   "shinylive", "webr",
-  # metadata file (not a directory, but keep it)
   "metadata.rds"
 )
 
@@ -201,8 +188,6 @@ if (dir.exists(pkg_dir)) {
     }
     message(sprintf("OK: Removed %d unused packages (saved %.1f MB)",
                     length(to_remove), removed_size / 1024 / 1024))
-    message(sprintf("    Kept %d packages needed by the app",
-                    length(all_items) - length(to_remove)))
   } else {
     message("No unused packages to remove.")
   }
