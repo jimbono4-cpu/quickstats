@@ -118,9 +118,10 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
 
       requestAnimationFrame(tick);
 
-      var obs = new MutationObserver(function() {
-        var root = document.getElementById(\'root\');
-        if (root && root.children.length > 0) {
+      function checkShinyReady() {
+        if (done) return;
+        var btn = document.getElementById(\'next_step\');
+        if (btn) {
           done = true;
           if (bar) bar.style.width = \'100%\';
           if (pctEl) pctEl.textContent = \'100%\';
@@ -132,10 +133,11 @@ if (!grepl("app-preloader", html, fixed = TRUE)) {
               setTimeout(function() { pre.remove(); }, 600);
             }, 400);
           }
-          obs.disconnect();
+        } else {
+          setTimeout(checkShinyReady, 300);
         }
-      });
-      obs.observe(document.getElementById(\'root\'), { childList: true, subtree: true });
+      }
+      setTimeout(checkShinyReady, 1000);
     })();
     </script>
   </body>
