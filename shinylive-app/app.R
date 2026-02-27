@@ -2932,17 +2932,30 @@ ui <- fluidPage(
         doc.close();
         // Wait for content to render, then generate PDF
         setTimeout(function() {
-          var opt = {
-            margin: [15, 15, 15, 15],
-            filename: 'analysis_report.pdf',
-            image: { type: 'png', quality: 1.0 },
-            html2canvas: { scale: 4, useCORS: true, letterRendering: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-          };
-          html2pdf().set(opt).from(doc.body).save().then(function() {
+          if (typeof html2pdf !== 'undefined') {
+            var opt = {
+              margin: [15, 15, 15, 15],
+              filename: 'analysis_report.pdf',
+              image: { type: 'png', quality: 1.0 },
+              html2canvas: { scale: 4, useCORS: true, letterRendering: true, logging: false },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            html2pdf().set(opt).from(doc.body).save().then(function() {
+              document.body.removeChild(iframe);
+            });
+          } else {
+            // Fallback: open in new window for browser Print > Save as PDF
+            var win = window.open('', '_blank');
+            if (win) {
+              win.document.write(msg.content);
+              win.document.close();
+              setTimeout(function() { win.print(); }, 300);
+            } else {
+              alert('Please allow pop-ups, then click Download as PDF again.');
+            }
             document.body.removeChild(iframe);
-          });
+          }
         }, 500);
       });
 
