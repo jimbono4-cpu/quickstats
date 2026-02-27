@@ -55,8 +55,10 @@ Additional features:
 
 ### Step 5 — Results & Export
 - Review all tables and plots in one place
-- **Copy to clipboard** — paste tables directly into Word or Google Docs as formatted HTML
+- **Download as PDF** — full report with tables and figures saved as a PDF file
+- **Download as Text** (.txt) — plain text report for easy sharing or archiving
 - **Download as Word** (.doc) — complete report with tables and embedded plots
+- **Copy to clipboard** — paste tables directly into Word or Google Docs as formatted HTML
 - **AI analysis prompt** — auto-generated prompt summarising your analysis for use with ChatGPT, Claude, or other LLMs
 
 ---
