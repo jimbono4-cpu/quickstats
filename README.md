@@ -11,7 +11,7 @@
 
 ## Why Quickstats?
 
-Most statistical tools require installing software, uploading data to a server, or writing code. StatsBrowser eliminates all three barriers — just open a link and start analysing.
+Most statistical tools require installing software, uploading data to a server, or writing code. Quickstats eliminates all three barriers — just open a link and start analysing.
 
 - **100% private** — your data never leaves your computer. All computation happens on your machine. Analysis powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. 
 - **No installation** — works in any modern browser (Chrome, Firefox, Edge, Safari). No R, no Python, no setup. 
@@ -111,7 +111,7 @@ Additional features:
 
 ## Privacy
 
-**Your data stays on your device.** StatsBrowser uses WebAssembly to run R directly in your browser tab. There is no server, no database, no analytics, and no cookies. When you close the tab, everything is gone.
+**Your data stays on your device.** Quickstats uses WebAssembly to run R directly in your browser tab. There is no server, no database, no analytics, and no cookies. When you close the tab, everything is gone.
 
 ---
 
