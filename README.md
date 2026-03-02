@@ -4,6 +4,9 @@
 
 > **[Launch the app](https://jimbono4-cpu.github.io/quickstats/)**
 
+<p align="center">
+  <img src="quickstats.gif" width="900">
+</p>
 ---
 
 ## Why Quickstats?
