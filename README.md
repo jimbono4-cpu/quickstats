@@ -47,7 +47,7 @@ Additional features:
 - **Cluster-robust standard errors** (sandwich estimator)
 - **VIF** for multicollinearity diagnostics
 - **Marginal means** (emmeans) for factor predictors
-- **Forest plots** of coefficients, odds ratios, or hazard ratios
+- **All models automatically generate forest plots** of coefficients, odds ratios, or hazard ratios
 - Automatic generation of plots depending on model chosen. For example, survival plots with option to stratify if you choose Cox model 
 - **Diagnostic plots** — residuals vs fitted, Q-Q plots, Cook's distance
 - **Exposure vs outcome** scatter plots with regression lines
