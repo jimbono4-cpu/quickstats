@@ -2,7 +2,7 @@
 
 **A statistical analysis tool that creates publication-ready tables and plots in seconds runs entirely in your browser. No installation. No server. Your data never leaves your device.**
 
-> **[Launch the app](https://jimbono4-cpu.github.io/Drafts-06.02.2026/)**
+> **[Launch the app](https://jimbono4-cpu.github.io/quickstats/)**
 
 ---
 
