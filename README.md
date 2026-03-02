@@ -6,7 +6,7 @@
 
 ---
 
-## Why StatsBrowser?
+## Why Quickstats?
 
 Most statistical tools require installing software, uploading data to a server, or writing code. StatsBrowser eliminates all three barriers — just open a link and start analysing.
 
@@ -31,21 +31,42 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), or SAS (
 - Set variable types (continuous, categorical) and apply labels
 - Normality testing (Shapiro-Wilk)
 
+<img width="1554" height="887" alt="image" src="https://github.com/user-attachments/assets/b2d12b02-14b3-4893-a1ac-6b603cb04291" />
+<img width="1885" height="739" alt="image" src="https://github.com/user-attachments/assets/0d0d0e3d-4bd1-470a-b326-85838dc67c9f" />
+<img width="1887" height="859" alt="image" src="https://github.com/user-attachments/assets/cc2b3341-cb7d-4df3-a3de-ec18c3f36649" />
+
 ### Step 3 — Table 1 (Descriptive Statistics)
 - Generate a publication-quality **Table 1** stratified by any grouping variable
-- Continuous variables: mean (SD) or median (IQR) based on normality
+- Continuous variables: mean (SD) or median (IQR) based on optional normality tests
 - Categorical variables: n (%)
 - Optional overall column with sample sizes — e.g. `Overall (N=500)`
 - Chi-squared and t-test / Wilcoxon / ANOVA / Kruskal-Wallis p-values
 - Copy to clipboard for direct pasting into Word
+
+<img width="1880" height="878" alt="image" src="https://github.com/user-attachments/assets/5db965b2-a153-4ae4-8280-711a0e4d60d8" />
 
 ### Step 4 — Regression Models
 | Model | Use case |
 |-------|----------|
 | **Linear regression** | Continuous outcomes |
 | **Logistic regression** | Binary outcomes (odds ratios) |
-| **Cox regression** | Time-to-event / survival data (hazard ratios) |
+| **Cox regression** | Time-to-event / survival data (hazard ratios) plus Schoenfeld residuals to test for proportional hazards|
 | **Mixed model** | Clustered / hierarchical data with random effects |
+**Plots** automatically generated depedent on model. Forest plots provided for all. Multiple plots chosen are faceted/ tiled.
+<img width="1894" height="885" alt="image" src="https://github.com/user-attachments/assets/7a8b01b5-b398-46dc-b26b-910d0b384a8e" />
+<img width="1887" height="883" alt="image" src="https://github.com/user-attachments/assets/7a58f2b7-9cc0-4bea-8be1-bb6a7c9103e7" />
+<img width="1262" height="915" alt="image" src="https://github.com/user-attachments/assets/d682da2f-091f-4094-8981-c5a1c0acd891" />
+<img width="1251" height="466" alt="image" src="https://github.com/user-attachments/assets/59cdcc75-54d2-4e30-a167-c7f0a0339400" />
+
+### Step 5 — Results & Export
+- Review all tables and plots in one place
+- **Download as PDF** — full report with tables and figures saved as a PDF file
+- **Download as Text** (.txt) — plain text report for easy sharing or archiving
+- **Download as Word** (.doc) — complete report with tables and embedded plots
+- **Copy to clipboard** — paste tables directly into Word or Google Docs as formatted HTML
+- **AI analysis prompt** — auto-generated prompt summarising your analysis for use with ChatGPT, Claude, or other LLMs
+<img width="1890" height="524" alt="image" src="https://github.com/user-attachments/assets/a67c1d1a-0e60-4f55-b8e6-f495f7896d07" />
+<img width="1815" height="1021" alt="image" src="https://github.com/user-attachments/assets/5e5833d2-3151-407d-83a5-ed7f1d3d90cc" />
 
 Additional features:
 - **Cluster-robust standard errors** (sandwich estimator)
@@ -58,19 +79,11 @@ Additional features:
 - Automatic confidence intervals and exponentiation for logistic/Cox models
 - Complete-case analysis with transparent missing data reporting
 
-### Step 5 — Results & Export
-- Review all tables and plots in one place
-- **Download as PDF** — full report with tables and figures saved as a PDF file
-- **Download as Text** (.txt) — plain text report for easy sharing or archiving
-- **Download as Word** (.doc) — complete report with tables and embedded plots
-- **Copy to clipboard** — paste tables directly into Word or Google Docs as formatted HTML
-- **AI analysis prompt** — auto-generated prompt summarising your analysis for use with ChatGPT, Claude, or other LLMs
-
 ---
 
 ## Quick Start
 
-1. **Open** the app: [jimbono4-cpu.github.io/Drafts-06.02.2026](https://jimbono4-cpu.github.io/Drafts-06.02.2026/)
+1. **Open** the app: [https://jimbono4-cpu.github.io/quickstats/](https://jimbono4-cpu.github.io/quickstats/)
 2. **Wait** for R to load in your browser (~30–45 seconds on first visit, faster on reload)
 3. **Upload** a CSV or Excel file
 4. **Analyse** — follow the 5-step wizard from exploration to export
