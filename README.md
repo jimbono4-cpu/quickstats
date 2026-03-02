@@ -22,7 +22,8 @@ Most statistical tools require installing software, uploading data to a server, 
 ### Step 1 — Upload Data
 Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), or SAS (.sas7bdat)** format. Variable labels from Stata/SPSS files are automatically preserved.
 
-<img width="1887" height="732" alt="image" src="https://github.com/user-attachments/assets/1fbd46f3-4580-49bb-864d-1919d4706dfc" />
+<img width="1887" height="827" alt="image" src="https://github.com/user-attachments/assets/19ce0b2e-d59c-4a75-a906-102308fb31ab" />
+
 
 ### Step 2 — Explore Data
 - View variable distributions with histograms and bar charts
