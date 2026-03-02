@@ -1,6 +1,6 @@
 # StatsBrowser — In-Browser Statistical Analysis
 
-**A complete statistical analysis tool that runs entirely in your browser. No installation. No server. Your data never leaves your device.**
+**A statistical analysis tool that creates publication-ready tables and plots in seconds runs entirely in your browser. No installation. No server. Your data never leaves your device.**
 
 > **[Launch the app](https://jimbono4-cpu.github.io/Drafts-06.02.2026/)**
 
@@ -10,9 +10,9 @@
 
 Most statistical tools require installing software, uploading data to a server, or writing code. StatsBrowser eliminates all three barriers — just open a link and start analysing.
 
-- **100% private** — powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. All computation happens on your machine; nothing is sent to a server.
+- **100% private** — your data never leaves your computer. All computation happens on your machine. Analysis powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. 
 - **No installation** — works in any modern browser (Chrome, Firefox, Edge, Safari). No R, no Python, no setup.
-- **Publication-ready output** — generates publication level ready tables and plots you can paste directly into Word, Google Docs, or LaTeX.
+- **Publication-ready output** — generates publication level ready tables and plots in seconds you can paste directly into Word, Google Docs, Powerpoint, or LaTeX.
 
 ---
 
@@ -48,7 +48,7 @@ Additional features:
 - **VIF** for multicollinearity diagnostics
 - **Marginal means** (emmeans) for factor predictors
 - **Forest plots** of coefficients, odds ratios, or hazard ratios
-- Automatic generation of plots depending on model chosen. For example, survival plots with option to stratify if you choose Cox model. 
+- Automatic generation of plots depending on model chosen. For example, survival plots with option to stratify if you choose Cox model 
 - **Diagnostic plots** — residuals vs fitted, Q-Q plots, Cook's distance
 - **Exposure vs outcome** scatter plots with regression lines
 - Automatic confidence intervals and exponentiation for logistic/Cox models
