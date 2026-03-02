@@ -13,7 +13,7 @@ Most statistical tools require installing software, uploading data to a server, 
 - **100% private** — your data never leaves your computer. All computation happens on your machine. Analysis powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. 
 - **No installation** — works in any modern browser (Chrome, Firefox, Edge, Safari). No R, no Python, no setup.
 - **Publication-ready output** — generates publication level ready tables and plots in seconds you can paste directly into Word, Google Docs, Powerpoint, or LaTeX.
-
+- **Initial load will be around 45 seconds but quicker on subsequent loads** 
 ---
 
 ## Features
