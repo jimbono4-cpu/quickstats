@@ -5,7 +5,9 @@
 > **[Launch the app](https://jimbono4-cpu.github.io/quickstats/)**
 
 <p align="center">
+<a href="https://jimbono4-cpu.github.io/quickstats/">
   <img src="quickstats.gif" width="900">
+</a>
 </p>
 ---
 
