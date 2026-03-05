@@ -48,7 +48,7 @@ PRELOADER_HTML='    <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...<\/p>
       <div class="preloader-bar"><div class="preloader-bar-fill"><\/div><\/div>
-      <p style="font-size:12px; margin-top:20px; opacity:0.6;">First load may take 15-30s. No data leaves your browser.<\/p>
+      <p style="font-size:12px; margin-top:20px; opacity:0.6;">First load may take 15-30s. Your data never leaves your computer. All analysis done locally on your computer.<\/p>
     <\/div>'
 
 # --- Inject MutationObserver script (before </body>) ---
@@ -106,7 +106,7 @@ preloader_div = """    <div class="app-preloader" id="preloader">
       <h1>Statistical Analysis App</h1>
       <p>Loading R environment in your browser...</p>
       <div class="preloader-bar"><div class="preloader-bar-fill"></div></div>
-      <p style="font-size:12px; margin-top:20px; opacity:0.6;">First load may take 15-30s. No data leaves your browser.</p>
+      <p style="font-size:12px; margin-top:20px; opacity:0.6;">First load may take 15-30s. Your data never leaves your computer. All analysis done locally on your computer.</p>
     </div>
 """
 html = html.replace("<body>", "<body>\n" + preloader_div)

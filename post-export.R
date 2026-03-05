@@ -78,7 +78,7 @@ optimized <- '<!doctype html>
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
       <div class="preloader-status" id="pstatus">Connecting...</div>
-      <p style="font-size:11px; margin-top:24px; opacity:0.45;">No data leaves your browser.</p>
+      <p style="font-size:11px; margin-top:24px; opacity:0.45;">Your data never leaves your computer. All analysis done locally on your computer.</p>
     </div>
     <script>
     (function() {
