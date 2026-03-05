@@ -167,6 +167,8 @@ optimized <- '<!doctype html>
       setTimeout(checkShinyReady, 2000);
     })();
     </script>
+    <script data-goatcounter="https://jimbono4.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
   </body>
 </html>'
 

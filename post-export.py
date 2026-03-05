@@ -74,7 +74,11 @@ SCRIPT = """    <script>
 
 html = html.replace("</head>", CSS + "  </head>")
 html = html.replace("<body>", "<body>\n" + DIV)
-html = html.replace("</body>", SCRIPT + "  </body>")
+GOATCOUNTER = """    <script data-goatcounter="https://jimbono4.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
+"""
+
+html = html.replace("</body>", SCRIPT + GOATCOUNTER + "  </body>")
 
 with open(INDEX, "w", encoding="utf-8") as f:
     f.write(html)

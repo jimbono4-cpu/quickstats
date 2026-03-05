@@ -125,7 +125,11 @@ observer_script = """    <script>
       observer.observe(document.getElementById('root'), { childList: true, subtree: true });
     </script>
 """
-html = html.replace("</body>", observer_script + "  </body>")
+goatcounter = """    <script data-goatcounter="https://jimbono4.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
+"""
+
+html = html.replace("</body>", observer_script + goatcounter + "  </body>")
 
 with open("docs/index.html", "w") as f:
     f.write(html)
