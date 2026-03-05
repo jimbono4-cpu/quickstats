@@ -1,6 +1,6 @@
 # Quickstats — In-Browser Statistical Analysis
 
-**A statistical analysis tool that creates publication-ready tables and plots in seconds runs entirely in your browser. No installation. No server. Your data never leaves your device.**
+**A statistical analysis tool that creates publication-ready tables and plots in seconds that runs entirely in your browser. No installation. No server. Your data never leaves your device.**
 
 > **[Launch the app](https://quickstats.tools/)**
 
