@@ -88,7 +88,7 @@ Additional features:
 
 ## Quick Start
 
-1. **Open** the app: [https://jimbono4-cpu.github.io/quickstats/](https://jimbono4-cpu.github.io/quickstats/)
+1. **Open** the app: [https://quickstats.tools/](https://quickstats.tools/)
 2. **Wait** for R to load in your browser (~30–45 seconds on first visit, faster on reload)
 3. **Upload** a CSV, Excel, Stata, SAS, or SPSS file
 4. **Analyse** — follow the 5-step wizard from exploration to export
