@@ -116,6 +116,7 @@ Additional features:
 **Your data stays on your device.** Quickstats uses WebAssembly to run R directly in your browser tab. There is no server, no database, and no cookies. We use privacy-friendly, cookie-free analytics ([GoatCounter](https://www.goatcounter.com/)) to count page visits — your uploaded data is never transmitted. When you close the tab, everything is gone.
 
 ---
+⭐ If you find QuickStats useful, please star the project on GitHub.
 
 ## License
 
