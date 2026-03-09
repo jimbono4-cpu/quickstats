@@ -3,7 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Statistical Analysis App</title>
+    <title>QuickStats — Free Online Statistical Analysis Tool | T-Tests, ANOVA, Regression</title>
+    <meta name="description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up, no data uploaded — your data stays on your device. Powered by R and WebAssembly.">
+    <meta name="keywords" content="statistics, statistical analysis, t-test, ANOVA, regression, chi-square, free statistics tool, online statistics calculator, R statistics, data analysis">
+    <link rel="canonical" href="https://quickstats.tools/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://quickstats.tools/">
+    <meta property="og:title" content="QuickStats — Free Online Statistical Analysis Tool">
+    <meta property="og:description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up — your data never leaves your device.">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="QuickStats — Free Online Statistical Analysis Tool">
+    <meta name="twitter:description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up — your data never leaves your device.">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "QuickStats",
+      "url": "https://quickstats.tools/",
+      "description": "Free online statistical analysis tool. Run t-tests, ANOVA, regression, and more directly in your browser with no data uploaded.",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Any",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "browserRequirements": "Requires a modern browser with WebAssembly support"
+    }
+    </script>
+
     <link rel="modulepreload" href="./shinylive/shinylive.js">
     <link rel="preload" href="./shinylive/webr/R.bin.wasm" as="fetch" crossorigin>
     <link rel="preload" href="./shinylive/webr/library.data.gz" as="fetch" crossorigin>
@@ -70,11 +100,32 @@
     </style>
   </head>
   <body>
+    <noscript>
+      <div style="max-width:700px; margin:60px auto; font-family:'Segoe UI',Tahoma,sans-serif; padding:20px;">
+        <h1>QuickStats — Free Online Statistical Analysis</h1>
+        <p>QuickStats is a free, privacy-first statistical analysis tool that runs entirely in your browser. No data is uploaded — everything stays on your device.</p>
+        <p>Supported tests: t-tests, ANOVA, regression, chi-square, correlation, descriptive statistics, and more.</p>
+        <p><strong>JavaScript is required to run this application.</strong> Please enable JavaScript and reload the page.</p>
+      </div>
+    </noscript>
     <div style="height: 100vh; width: 100vw" id="root"></div>
     <!-- Preloader AFTER #root so it paints on top in document order -->
     <div class="app-preloader" id="preloader">
-      <h1>Statistical Analysis App</h1>
+      <h1>QuickStats</h1>
       <p>Loading R environment in your browser...</p>
+      <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+        <h2>Free Online Statistical Analysis Tool</h2>
+        <p>QuickStats lets you run statistical tests directly in your browser — no installation, no sign-up, and no data uploaded to any server. Powered by R and WebAssembly, all analysis runs locally on your device.</p>
+        <ul>
+          <li>T-Tests (one-sample, two-sample, paired)</li>
+          <li>ANOVA (one-way, two-way)</li>
+          <li>Linear and logistic regression</li>
+          <li>Chi-square tests</li>
+          <li>Descriptive statistics and data visualization</li>
+          <li>Correlation analysis</li>
+        </ul>
+        <p>Perfect for students, researchers, and anyone who needs quick, private statistical analysis.</p>
+      </div>
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
       <div class="preloader-status" id="pstatus">Connecting...</div>
