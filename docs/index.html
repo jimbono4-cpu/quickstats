@@ -3,21 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QuickStats — Free Online Statistical Analysis Tool | T-Tests, ANOVA, Regression</title>
-    <meta name="description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up, no data uploaded — your data stays on your device. Powered by R and WebAssembly.">
-    <meta name="keywords" content="statistics, statistical analysis, t-test, ANOVA, regression, chi-square, free statistics tool, online statistics calculator, R statistics, data analysis">
+    <title>QuickStats — Free Online Regression &amp; Descriptive Statistics Tool</title>
+    <meta name="description" content="Run linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 descriptive statistics — all in your browser. No installation, no sign-up, no data uploaded. Powered by R and WebAssembly.">
+    <meta name="keywords" content="statistics, regression, logistic regression, Cox regression, mixed models, descriptive statistics, Table 1, forest plot, free statistics tool, online statistics calculator, R statistics, data analysis">
     <link rel="canonical" href="https://quickstats.tools/">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://quickstats.tools/">
-    <meta property="og:title" content="QuickStats — Free Online Statistical Analysis Tool">
-    <meta property="og:description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up — your data never leaves your device.">
+    <meta property="og:title" content="QuickStats — Free Online Regression & Descriptive Statistics Tool">
+    <meta property="og:description" content="Linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 — all in your browser. No data uploaded.">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="QuickStats — Free Online Statistical Analysis Tool">
-    <meta name="twitter:description" content="Run t-tests, ANOVA, regression, and more directly in your browser. No installation, no sign-up — your data never leaves your device.">
+    <meta name="twitter:title" content="QuickStats — Free Online Regression & Descriptive Statistics Tool">
+    <meta name="twitter:description" content="Linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 — all in your browser. No data uploaded.">
 
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -26,7 +26,7 @@
       "@type": "WebApplication",
       "name": "QuickStats",
       "url": "https://quickstats.tools/",
-      "description": "Free online statistical analysis tool. Run t-tests, ANOVA, regression, and more directly in your browser with no data uploaded.",
+      "description": "Free online statistical analysis tool. Run linear, logistic, Cox, and mixed-effects regression plus descriptive statistics directly in your browser with no data uploaded.",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Any",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -104,7 +104,7 @@
       <div style="max-width:700px; margin:60px auto; font-family:'Segoe UI',Tahoma,sans-serif; padding:20px;">
         <h1>QuickStats — Free Online Statistical Analysis</h1>
         <p>QuickStats is a free, privacy-first statistical analysis tool that runs entirely in your browser. No data is uploaded — everything stays on your device.</p>
-        <p>Supported tests: t-tests, ANOVA, regression, chi-square, correlation, descriptive statistics, and more.</p>
+        <p>Supports linear, logistic, Cox, and mixed-effects regression, publication-ready Table 1 descriptive statistics, forest plots, diagnostic plots, and export to PDF, Word, or text.</p>
         <p><strong>JavaScript is required to run this application.</strong> Please enable JavaScript and reload the page.</p>
       </div>
     </noscript>
@@ -115,16 +115,17 @@
       <p>Loading R environment in your browser...</p>
       <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
         <h2>Free Online Statistical Analysis Tool</h2>
-        <p>QuickStats lets you run statistical tests directly in your browser — no installation, no sign-up, and no data uploaded to any server. Powered by R and WebAssembly, all analysis runs locally on your device.</p>
+        <p>QuickStats lets you run regression models and generate descriptive statistics directly in your browser — no installation, no sign-up, and no data uploaded to any server. Powered by R and WebAssembly, all analysis runs locally on your device.</p>
         <ul>
-          <li>T-Tests (one-sample, two-sample, paired)</li>
-          <li>ANOVA (one-way, two-way)</li>
-          <li>Linear and logistic regression</li>
-          <li>Chi-square tests</li>
-          <li>Descriptive statistics and data visualization</li>
-          <li>Correlation analysis</li>
+          <li>Linear regression for continuous outcomes</li>
+          <li>Logistic regression with odds ratios for binary outcomes</li>
+          <li>Cox regression for survival and time-to-event data</li>
+          <li>Mixed-effects models for clustered or hierarchical data</li>
+          <li>Publication-ready Table 1 descriptive statistics</li>
+          <li>Forest plots, diagnostic plots, and scatter plots</li>
+          <li>Export to PDF, Word, or plain text</li>
         </ul>
-        <p>Perfect for students, researchers, and anyone who needs quick, private statistical analysis.</p>
+        <p>Perfect for students, researchers, and clinicians who need quick, private statistical analysis.</p>
       </div>
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
