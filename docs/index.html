@@ -112,7 +112,7 @@
     <!-- Preloader AFTER #root so it paints on top in document order -->
     <div class="app-preloader" id="preloader">
       <h1>QuickStats</h1>
-      <p>Loading R environment in your browser...</p>
+      <p style="font-size:17px; max-width:480px; text-align:center; line-height:1.5; opacity:0.95;">Starting the analysis engine&hellip;<br>This tool runs R directly in your browser using WebR. The first load takes about 30&ndash;60 seconds while the analysis environment starts. After this, loading will be much faster.</p>
       <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
         <h2>Free Online Statistical Analysis Tool</h2>
         <p>QuickStats lets you run regression models and generate descriptive statistics directly in your browser — no installation, no sign-up, and no data uploaded to any server. Powered by R and WebAssembly, all analysis runs locally on your device.</p>
@@ -130,7 +130,7 @@
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
       <div class="preloader-status" id="pstatus">Connecting...</div>
-      <p style="font-size:11px; margin-top:24px; opacity:0.45;">Your data never leaves your computer. All analysis runs locally on your computer</p>
+      <p style="font-size:13px; margin-top:24px; opacity:0.55;">All analysis runs locally in your browser &mdash; your data never leaves your computer.</p>
     </div>
     <script>
     (function() {
@@ -188,7 +188,7 @@
         if (pre) {
           setTimeout(function() {
             pre.classList.add("hidden");
-            setTimeout(function() { pre.remove(); var fb = document.getElementById("feedbackLink"); if (fb) fb.classList.add("visible"); }, 600);
+            setTimeout(function() { pre.remove(); var fb = document.getElementById("feedbackLink"); if (fb) fb.classList.add("visible"); var sl = document.getElementById("starLink"); if (sl) sl.classList.add("visible"); }, 600);
           }, 400);
         }
       }
@@ -221,6 +221,9 @@
     </script>
     <div class="feedback-link" id="feedbackLink">
       <a href="https://github.com/jimbono4-cpu/Drafts-06.02.2026/issues/new" target="_blank" rel="noopener">Feedback &amp; Bug Reports</a>
+    </div>
+    <div class="feedback-link" id="starLink" style="right:180px;">
+      <a href="https://github.com/jimbono4-cpu/Drafts-06.02.2026" target="_blank" rel="noopener">&#11088; Star on GitHub</a>
     </div>
     <script data-goatcounter="https://jimbono4.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>

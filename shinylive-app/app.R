@@ -3044,7 +3044,7 @@ ui <- fluidPage(
 
   # Privacy banner
   div(class = "privacy-banner",
-    "Your data never leaves your browser. All analysis runs locally via WebR."
+    "Your data never leaves your computer. All analysis runs locally in your browser."
   ),
 
   # Title
