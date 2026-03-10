@@ -19,7 +19,7 @@ Most statistical tools require installing software, uploading data to a server, 
 - **No installation** — works in any modern browser (Chrome, Firefox, Edge, Safari). No R, no Python, no setup. 
 - **Publication-ready output** — generates publication level ready tables and plots in seconds you can paste directly into Word, Google Docs, Powerpoint, or LaTeX.
 - **Run statistical analyses using R without writing R code** 
-- **Initial load will be around 45 seconds but quicker on subsequent loads** 
+- **The first load takes about 30–60 seconds while the analysis environment starts. After this, loading will be much faster.** 
 ---
 
 ## Features
