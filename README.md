@@ -15,7 +15,7 @@
 
 Most statistical tools require installing software, uploading data to a server, or writing code. Quickstats eliminates all three barriers — just open a link and start analysing.
 
-- **100% private** — your data never leaves your computer. All computation happens on your machine. Analysis powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. This is unlike Jamovi cloud or RStudio cloud which need data to be uploaded to their servers.
+- **100% private** — your data never leaves your computer. All computation happens on your machine. Analysis powered by [WebR](https://docs.r-wasm.org/webr/latest/), the R language compiled to WebAssembly. This is unlike Jamovi cloud or RStudio cloud which require data to be uploaded to their servers.
 - **No installation** — works in any modern browser (Chrome, Firefox, Edge, Safari). No R, no Python, no setup. 
 - **Publication-ready output** — generates publication level ready tables and plots in seconds you can paste directly into Word, Google Docs, Powerpoint, or LaTeX.
 - **Run statistical analyses using R without writing R code** 
