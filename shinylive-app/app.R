@@ -154,6 +154,13 @@ safe_read_data <- function(file_path, file_name) {
         as.data.frame(haven::read_sas(file_path))
       },
       "rds" = as.data.frame(readRDS(file_path)),
+      "rda" = , "rdata" = {
+        env <- new.env(parent = emptyenv())
+        load(file_path, envir = env)
+        objs <- ls(env)
+        if (length(objs) == 0) stop("No objects found in .rda/.RData file")
+        as.data.frame(get(objs[1], envir = env))
+      },
       stop(paste("Unsupported file format:", ext))
     )
     list(data = df, error = NULL)
@@ -205,10 +212,11 @@ upload_ui <- function(id) {
           h4("Upload Your Data"),
           fileInput(ns("file"), "Choose file",
                     accept = c(".csv", ".tsv", ".xlsx", ".xls",
-                               ".dta", ".sav", ".sas7bdat", ".rds")),
+                               ".dta", ".sav", ".sas7bdat", ".rds",
+                               ".rda", ".RData")),
           p(class = "text-muted small",
             "Supported: CSV, TSV, Excel (.xlsx/.xls), Stata (.dta),",
-            "SPSS (.sav), SAS (.sas7bdat), R (.rds)"),
+            "SPSS (.sav), SAS (.sas7bdat), R (.rds/.rda/.RData)"),
           hr(),
           h5("Or use example data"),
           actionButton(ns("use_example"), "Load mtcars example",
