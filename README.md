@@ -25,7 +25,7 @@ Most statistical tools require installing software, uploading data to a server, 
 ## Features
 
 ### Step 1 — Upload Data
-Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), or SAS (.sas7bdat)**, R (.rds or .rds) format. Variable labels from Stata/SPSS files are automatically preserved.
+Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sas7bdat)**, or R (.rds or .rds) format. Variable labels from Stata/SPSS files are automatically preserved.
 
 <img width="1887" height="827" alt="image" src="https://github.com/user-attachments/assets/19ce0b2e-d59c-4a75-a906-102308fb31ab" />
 
