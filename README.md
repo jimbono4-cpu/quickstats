@@ -69,7 +69,6 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sa
 - **Download as Text** (.txt) — plain text report for easy sharing or archiving
 - **Download as Word** (.doc) — complete report with tables and embedded plots
 - **Copy to clipboard** — paste tables directly into Word or Google Docs as formatted HTML
-- **AI analysis prompt** — auto-generated prompt summarising your analysis for use with ChatGPT, Claude, or other LLMs
 <img width="1890" height="524" alt="image" src="https://github.com/user-attachments/assets/a67c1d1a-0e60-4f55-b8e6-f495f7896d07" />
 <img width="1815" height="1021" alt="image" src="https://github.com/user-attachments/assets/5e5833d2-3151-407d-83a5-ed7f1d3d90cc" />
 
@@ -110,6 +109,7 @@ Additional features:
 `ggplot2` · `broom` · `survival` · `sandwich` · `lmtest` · `car` · `emmeans` · `lme4` · `nlme` · `haven` · `readxl` · `writexl` · `gridExtra` · `base64enc`
 
 ---
+Completely free statistical analysis tool
 
 ## Privacy
 
