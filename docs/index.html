@@ -3,21 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QuickStats — Free Online Regression &amp; Descriptive Statistics Tool</title>
-    <meta name="description" content="Run linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 descriptive statistics — all in your browser. No installation, no sign-up, no data uploaded. Powered by R and WebAssembly.">
-    <meta name="keywords" content="statistics, regression, logistic regression, Cox regression, mixed models, descriptive statistics, Table 1, forest plot, free statistics tool, online statistics calculator, R statistics, data analysis">
+    <title>Run R in the Browser – QuickStats Statistical Analysis Tool</title>
+    <meta name="description" content="Run statistical analyses directly in the browser using R (WebR). Upload datasets and generate publication-ready statistical tables and plots with no R installation required.">
+    <meta name="keywords" content="run R in browser, WebR, statistical analysis tool, statistics online, data analysis tool, R statistics online, regression, logistic regression, Cox regression, mixed models, descriptive statistics, Table 1, forest plot, free statistics tool, online statistics calculator">
+    <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://quickstats.tools/">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://quickstats.tools/">
-    <meta property="og:title" content="QuickStats — Free Online Regression & Descriptive Statistics Tool">
-    <meta property="og:description" content="Linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 — all in your browser. No data uploaded.">
+    <meta property="og:title" content="QuickStats – Run R in the Browser">
+    <meta property="og:description" content="Browser-based statistical analysis using WebR. Upload datasets and generate statistical tables and plots instantly.">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="QuickStats — Free Online Regression & Descriptive Statistics Tool">
-    <meta name="twitter:description" content="Linear, logistic, Cox, and mixed-effects regression plus publication-ready Table 1 — all in your browser. No data uploaded.">
+    <meta name="twitter:title" content="QuickStats – Run R in the Browser">
+    <meta name="twitter:description" content="Browser-based statistical analysis using WebR. Upload datasets and generate statistical tables and plots instantly.">
 
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -26,7 +27,7 @@
       "@type": "WebApplication",
       "name": "QuickStats",
       "url": "https://quickstats.tools/",
-      "description": "Free online statistical analysis tool. Run linear, logistic, Cox, and mixed-effects regression plus descriptive statistics directly in your browser with no data uploaded.",
+      "description": "Run R statistical analyses directly in the browser using WebR. Upload datasets and generate publication-ready statistical tables and plots with no installation required.",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Any",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -97,36 +98,60 @@
         border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.12);
       }
       .feedback-link a:hover { text-decoration: underline; }
+      /* SEO content: visible to crawlers, hidden once app loads */
+      #seo-content {
+        max-width: 740px; margin: 40px auto; padding: 20px 24px;
+        font-family: "Segoe UI", Tahoma, sans-serif; color: #333;
+        line-height: 1.6;
+      }
+      #seo-content h1 { font-size: 26px; color: #4a5568; margin-bottom: 12px; }
+      #seo-content h2 { font-size: 20px; color: #4a5568; margin-top: 28px; margin-bottom: 8px; }
+      #seo-content h3 { font-size: 16px; color: #555; margin-top: 16px; margin-bottom: 4px; }
+      #seo-content ul { padding-left: 20px; }
+      #seo-content li { margin-bottom: 4px; }
+      #seo-content p { margin-bottom: 10px; }
+      #seo-content.hidden { display: none; }
     </style>
   </head>
   <body>
-    <noscript>
-      <div style="max-width:700px; margin:60px auto; font-family:'Segoe UI',Tahoma,sans-serif; padding:20px;">
-        <h1>QuickStats — Free Online Statistical Analysis</h1>
-        <p>QuickStats is a free, privacy-first statistical analysis tool that runs entirely in your browser. No data is uploaded — everything stays on your device.</p>
-        <p>Supports linear, logistic, Cox, and mixed-effects regression, publication-ready Table 1 descriptive statistics, forest plots, diagnostic plots, and export to PDF, Word, or text.</p>
+    <div id="seo-content">
+      <h1>Run R in the Browser with QuickStats</h1>
+      <p>QuickStats is a browser-based statistical analysis tool powered by WebR. Upload datasets and generate statistical summaries, plots and publication-ready tables without installing R.</p>
+      <ul>
+        <li>Run R directly in the browser</li>
+        <li>No R installation required</li>
+        <li>Generate statistical tables and plots instantly</li>
+        <li>Your data never leaves your computer</li>
+      </ul>
+
+      <h2>Online Statistical Analysis Tool</h2>
+      <p>QuickStats allows researchers, students and analysts to run statistical analyses directly in the browser.</p>
+      <ul>
+        <li>Descriptive statistics and publication-ready Table 1</li>
+        <li>Linear, logistic, Cox and mixed-effects regression</li>
+        <li>Forest plots, diagnostic plots and data visualisations</li>
+        <li>Export to PDF, Word or plain text</li>
+      </ul>
+
+      <h2>Frequently Asked Questions</h2>
+      <h3>What is WebR?</h3>
+      <p>WebR is a version of the R statistical programming language compiled to WebAssembly that runs directly in web browsers.</p>
+      <h3>Can I run R without installing it?</h3>
+      <p>Yes. QuickStats allows you to run R statistical analyses entirely in the browser without installing R or any software.</p>
+      <h3>Is my data uploaded?</h3>
+      <p>No. All analysis runs locally in your browser, so your data never leaves your computer.</p>
+
+      <p>If you need a statistical analysis tool without installing R, QuickStats provides a simple way to run R directly in the browser using WebR.</p>
+
+      <noscript>
         <p><strong>JavaScript is required to run this application.</strong> Please enable JavaScript and reload the page.</p>
-      </div>
-    </noscript>
+      </noscript>
+    </div>
     <div style="height: 100vh; width: 100vw" id="root"></div>
     <!-- Preloader AFTER #root so it paints on top in document order -->
     <div class="app-preloader" id="preloader">
       <h1>QuickStats</h1>
       <p style="font-size:17px; max-width:480px; text-align:center; line-height:1.5; opacity:0.95;">Starting the analysis engine&hellip;<br>This tool runs R directly in your browser using WebR. The first load takes about 30&ndash;60 seconds while the analysis environment starts. After this, loading will be much faster.</p>
-      <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
-        <h2>Free Online Statistical Analysis Tool</h2>
-        <p>QuickStats lets you run regression models and generate descriptive statistics directly in your browser — no installation, no sign-up, and no data uploaded to any server. Powered by R and WebAssembly, all analysis runs locally on your device.</p>
-        <ul>
-          <li>Linear regression for continuous outcomes</li>
-          <li>Logistic regression with odds ratios for binary outcomes</li>
-          <li>Cox regression for survival and time-to-event data</li>
-          <li>Mixed-effects models for clustered or hierarchical data</li>
-          <li>Publication-ready Table 1 descriptive statistics</li>
-          <li>Forest plots, diagnostic plots, and scatter plots</li>
-          <li>Export to PDF, Word, or plain text</li>
-        </ul>
-        <p>Perfect for students, researchers, and clinicians who need quick, private statistical analysis.</p>
-      </div>
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
       <div class="preloader-status" id="pstatus">Connecting...</div>
@@ -184,6 +209,8 @@
         if (bar) bar.style.width = "100%";
         if (pctEl) pctEl.textContent = "100%";
         if (statusEl) statusEl.textContent = "Ready!";
+        var seo = document.getElementById("seo-content");
+        if (seo) seo.classList.add("hidden");
         var pre = document.getElementById("preloader");
         if (pre) {
           setTimeout(function() {
