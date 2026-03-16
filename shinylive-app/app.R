@@ -2108,15 +2108,22 @@ results_server <- function(id, shared) {
       }
 
       # Software
+      # Dynamically collect package versions for the manifest
+      all_pkgs <- c("ggplot2", "broom", "labelled", "survival", "sandwich",
+                     "lmtest", "car", "emmeans", "haven", "readxl", "writexl",
+                     "lme4", "gridExtra", "base64enc", "htmltools")
+      pkg_ver_list <- c()
+      for (pkg in all_pkgs) {
+        ver <- tryCatch(as.character(packageVersion(pkg)), error = function(e) NULL)
+        if (!is.null(ver)) {
+          pkg_ver_list <- c(pkg_ver_list, paste0(pkg, " v", ver))
+        } else {
+          pkg_ver_list <- c(pkg_ver_list, pkg)
+        }
+      }
       manifest$software <- list(
         r_version = R.version.string,
-        packages = paste(
-          c("ggplot2", "broom", "labelled",
-            "survival", "sandwich", "lmtest", "car", "emmeans",
-            "haven", "readxl", "writexl", "lme4",
-            "gridExtra", "base64enc"),
-          collapse = ", "
-        ),
+        packages = paste(pkg_ver_list, collapse = ", "),
         platform = "WebR (R compiled to WebAssembly, running in-browser)"
       )
 
@@ -2471,9 +2478,12 @@ results_server <- function(id, shared) {
         }, error = function(e) NULL)
       }
 
-      # Software
+      # Software — report all packages used by the app
+      all_pkgs <- c("ggplot2", "broom", "labelled", "survival", "sandwich",
+                     "lmtest", "car", "emmeans", "haven", "readxl", "writexl",
+                     "lme4", "gridExtra", "base64enc", "htmltools")
       pkg_versions <- c()
-      for (pkg in c("gtsummary", "ggplot2", "survival", "lme4")) {
+      for (pkg in all_pkgs) {
         if (requireNamespace(pkg, quietly = TRUE)) {
           ver <- tryCatch(as.character(packageVersion(pkg)), error = function(e) NULL)
           if (!is.null(ver)) pkg_versions <- c(pkg_versions, paste0(pkg, " v", ver))
