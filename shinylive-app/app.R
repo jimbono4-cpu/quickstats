@@ -2427,6 +2427,8 @@ results_server <- function(id, shared) {
       if (!is.null(shared$file_ext) && shared$file_ext %in% c("dta", "sav", "sas7bdat")) used_pkgs <- c(used_pkgs, "haven")
       if (!is.null(shared$model_result)) {
         mt <- shared$model_result$type
+        # stats provides lm(), glm(), AIC(), BIC() — always used when a model is fitted
+        used_pkgs <- c(used_pkgs, "stats")
         if (mt == "cox") used_pkgs <- c(used_pkgs, "survival")
         if (mt == "lmer") {
           if (isTRUE(shared$model_result$is_binary_mixed)) {
