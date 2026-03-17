@@ -389,7 +389,10 @@ explore_server <- function(id, shared) {
       tryCatch({
         if (requireNamespace("labelled", quietly = TRUE)) {
           l <- labelled::var_label(df[[v]])
-          if (!is.null(l)) lbl <- paste0(l, " (", v, ")")
+          if (!is.null(l)) {
+            shared$pkgs_used <- union(shared$pkgs_used, "labelled")
+            lbl <- paste0(l, " (", v, ")")
+          }
         }
       }, error = function(e) NULL)
 
@@ -477,6 +480,7 @@ explore_server <- function(id, shared) {
       for (v in vars) {
         lbl_val <- input[[paste0("lbl_", v)]]
         if (!is.null(lbl_val) && nchar(trimws(lbl_val)) > 0) {
+          shared$pkgs_used <- union(shared$pkgs_used, "labelled")
           labelled::var_label(df[[v]]) <- trimws(lbl_val)
         }
       }
@@ -1030,6 +1034,7 @@ model_server <- function(id, shared) {
             mixed_model_icc(NULL)
           })
         } else {
+          shared$pkgs_used <- union(shared$pkgs_used, "broom")
           tidy_df <- broom::tidy(mod, conf.int = TRUE)
           mixed_model_icc(NULL)
         }
@@ -1245,6 +1250,7 @@ model_server <- function(id, shared) {
       # VIF
       if (input$show_vif && input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("car", quietly = TRUE)) {
+          shared$pkgs_used <- union(shared$pkgs_used, "car")
           vif_html <- tryCatch({
             vif_vals <- car::vif(mod)
             if (is.matrix(vif_vals)) vif_vals <- vif_vals[, "GVIF"]
@@ -1268,6 +1274,7 @@ model_server <- function(id, shared) {
       # Estimated marginal means (lm/glm only)
       if (input$model_type %in% c("lm", "glm")) {
         if (requireNamespace("emmeans", quietly = TRUE)) {
+          shared$pkgs_used <- union(shared$pkgs_used, "emmeans")
           emm_html <- tryCatch({
             preds <- input$predictors
             factor_preds <- preds[sapply(shared$data[preds], function(x) {
@@ -1433,6 +1440,7 @@ model_server <- function(id, shared) {
           grDevices::dev.off()
           raw <- readBin(tmp, "raw", file.info(tmp)$size)
           unlink(tmp)
+          shared$pkgs_used <- union(shared$pkgs_used, "base64enc")
           shared$diagnostics_plot_base64 <- paste0("data:image/png;base64,", base64enc::base64encode(raw))
         }
       }, error = function(e) {
@@ -1673,6 +1681,7 @@ model_server <- function(id, shared) {
       } else {
         tryCatch({
           install_if_needed("gridExtra")
+          shared$pkgs_used <- union(shared$pkgs_used, "gridExtra")
           do.call(gridExtra::grid.arrange,
                   c(plot_list, ncol = 1))
         }, error = function(e) plot_list[[1]])
@@ -1813,6 +1822,7 @@ model_server <- function(id, shared) {
         grDevices::dev.off()
         raw <- readBin(tmp, "raw", file.info(tmp)$size)
         unlink(tmp)
+        shared$pkgs_used <- union(shared$pkgs_used, "base64enc")
         paste0("data:image/png;base64,", base64enc::base64encode(raw))
       }, error = function(e) {
         tryCatch(grDevices::dev.off(), error = function(e2) NULL)
@@ -2408,14 +2418,15 @@ results_server <- function(id, shared) {
     # --- HTML report for PDF export ---
     # Determine which R packages were actually used in the current analysis
     get_used_packages <- function() {
-      used_pkgs <- c("htmltools")
+      # Start with packages recorded at their call sites
+      used_pkgs <- union(c("htmltools"), shared$pkgs_used)
+      # Infer additional packages from shared state
       if (!is.null(shared$plots) && length(shared$plots) > 0) used_pkgs <- c(used_pkgs, "ggplot2")
       if (!is.null(shared$diagnostics_plot)) used_pkgs <- c(used_pkgs, "ggplot2")
       if (!is.null(shared$file_ext) && shared$file_ext %in% c("xlsx", "xls")) used_pkgs <- c(used_pkgs, "readxl")
       if (!is.null(shared$file_ext) && shared$file_ext %in% c("dta", "sav", "sas7bdat")) used_pkgs <- c(used_pkgs, "haven")
       if (!is.null(shared$model_result)) {
         mt <- shared$model_result$type
-        used_pkgs <- c(used_pkgs, "broom")
         if (mt == "cox") used_pkgs <- c(used_pkgs, "survival")
         if (mt == "lmer") {
           if (isTRUE(shared$model_result$is_binary_mixed)) {
@@ -3179,7 +3190,8 @@ server <- function(input, output, session) {
     last_export = NULL,
     packages_ready = TRUE,
     modeling_ready = FALSE,
-    file_ext = NULL
+    file_ext = NULL,
+    pkgs_used = character(0)
   )
 
   # --- Package installation -----------------------------------------------------
