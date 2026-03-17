@@ -253,6 +253,7 @@ upload_server <- function(id, shared) {
       }
       shared$data <- result$data
       shared$data_name <- input$file$name
+      shared$file_ext <- tolower(tools::file_ext(input$file$name))
       shared$var_types <- classify_variables(result$data)
       showNotification(
         paste("Loaded", nrow(result$data), "rows x", ncol(result$data), "columns"),
@@ -1059,8 +1060,10 @@ model_server <- function(id, shared) {
         }
 
         model_tidy(tidy_df)
+        used_robust <- isTRUE(input$robust_se) && input$model_type %in% c("lm", "glm")
         shared$model_result <- list(fit = mod, tidy = tidy_df, type = input$model_type,
-                                    is_binary_mixed = mixed_model_binary())
+                                    is_binary_mixed = mixed_model_binary(),
+                                    used_robust_se = used_robust)
 
         # Calculate observations dropped due to missing data
         n_total <- nrow(df)
@@ -2107,13 +2110,9 @@ results_server <- function(id, shared) {
         manifest$diagnostics_plot <- shared$diagnostics_plot
       }
 
-      # Software
-      # Dynamically collect package versions for the manifest
-      all_pkgs <- c("ggplot2", "broom", "labelled", "survival", "sandwich",
-                     "lmtest", "car", "emmeans", "haven", "readxl", "writexl",
-                     "lme4", "gridExtra", "base64enc", "htmltools")
+      # Software — report only packages actually used in this analysis
       pkg_ver_list <- c()
-      for (pkg in all_pkgs) {
+      for (pkg in get_used_packages()) {
         ver <- tryCatch(as.character(packageVersion(pkg)), error = function(e) NULL)
         if (!is.null(ver)) {
           pkg_ver_list <- c(pkg_ver_list, paste0(pkg, " v", ver))
@@ -2407,6 +2406,31 @@ results_server <- function(id, shared) {
     })
 
     # --- HTML report for PDF export ---
+    # Determine which R packages were actually used in the current analysis
+    get_used_packages <- function() {
+      used_pkgs <- c("htmltools")
+      if (!is.null(shared$plots) && length(shared$plots) > 0) used_pkgs <- c(used_pkgs, "ggplot2")
+      if (!is.null(shared$diagnostics_plot)) used_pkgs <- c(used_pkgs, "ggplot2")
+      if (!is.null(shared$file_ext) && shared$file_ext %in% c("xlsx", "xls")) used_pkgs <- c(used_pkgs, "readxl")
+      if (!is.null(shared$file_ext) && shared$file_ext %in% c("dta", "sav", "sas7bdat")) used_pkgs <- c(used_pkgs, "haven")
+      if (!is.null(shared$model_result)) {
+        mt <- shared$model_result$type
+        used_pkgs <- c(used_pkgs, "broom")
+        if (mt == "cox") used_pkgs <- c(used_pkgs, "survival")
+        if (mt == "lmer") {
+          if (isTRUE(shared$model_result$is_binary_mixed)) {
+            used_pkgs <- c(used_pkgs, "lme4")
+          } else {
+            used_pkgs <- c(used_pkgs, "nlme")
+          }
+        }
+        if (isTRUE(shared$model_result$used_robust_se)) {
+          used_pkgs <- c(used_pkgs, "sandwich", "lmtest")
+        }
+      }
+      unique(used_pkgs)
+    }
+
     # Generate a statistical methods summary paragraph
     build_methods_summary <- function() {
       parts <- c()
@@ -2478,12 +2502,9 @@ results_server <- function(id, shared) {
         }, error = function(e) NULL)
       }
 
-      # Software — report all packages used by the app
-      all_pkgs <- c("ggplot2", "broom", "labelled", "survival", "sandwich",
-                     "lmtest", "car", "emmeans", "haven", "readxl", "writexl",
-                     "lme4", "gridExtra", "base64enc", "htmltools")
+      # Software — report only packages actually used in this analysis
       pkg_versions <- c()
-      for (pkg in all_pkgs) {
+      for (pkg in get_used_packages()) {
         if (requireNamespace(pkg, quietly = TRUE)) {
           ver <- tryCatch(as.character(packageVersion(pkg)), error = function(e) NULL)
           if (!is.null(ver)) pkg_versions <- c(pkg_versions, paste0(pkg, " v", ver))
@@ -3157,7 +3178,8 @@ server <- function(input, output, session) {
     diagnostics_plot_base64 = NULL,
     last_export = NULL,
     packages_ready = TRUE,
-    modeling_ready = FALSE
+    modeling_ready = FALSE,
+    file_ext = NULL
   )
 
   # --- Package installation -----------------------------------------------------
