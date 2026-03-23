@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO Audit Report — QuickStats.tools</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a2e; background: #f8f9fa; line-height: 1.6; padding: 2rem; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin-bottom: 0.25rem; color: #0f3460; }
+  h2 { font-size: 1.5rem; margin: 2.5rem 0 1rem; color: #0f3460; border-bottom: 2px solid #e94560; padding-bottom: 0.4rem; }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 0.5rem; color: #16213e; }
+  .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 2rem; }
+  .exec-summary { background: #eef2ff; border-left: 4px solid #0f3460; padding: 1.25rem 1.5rem; border-radius: 0 8px 8px 0; margin-bottom: 2rem; }
+  .exec-summary p { margin-bottom: 0.5rem; }
+  .score-badge { display: inline-block; background: #e94560; color: #fff; padding: 0.3rem 0.9rem; border-radius: 20px; font-weight: 700; font-size: 1.1rem; margin-right: 0.5rem; }
+  .score-badge.green { background: #27ae60; }
+  .score-badge.yellow { background: #f39c12; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 0.9rem; }
+  th, td { padding: 0.6rem 0.8rem; text-align: left; border: 1px solid #ddd; }
+  th { background: #0f3460; color: #fff; font-weight: 600; }
+  tr:nth-child(even) { background: #f4f6fa; }
+  .severity-critical { background: #fce4ec; color: #c62828; font-weight: 700; }
+  .severity-high { background: #fff3e0; color: #e65100; font-weight: 700; }
+  .severity-medium { background: #fff8e1; color: #f57f17; font-weight: 600; }
+  .severity-low { background: #e8f5e9; color: #2e7d32; }
+  .status-pass { color: #27ae60; font-weight: 700; }
+  .status-fail { color: #c62828; font-weight: 700; }
+  .status-warn { color: #f39c12; font-weight: 700; }
+  .action-section { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+  .action-section h3 { margin-top: 0; }
+  .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; margin-right: 0.3rem; }
+  .tag-high { background: #fce4ec; color: #c62828; }
+  .tag-med { background: #fff8e1; color: #f57f17; }
+  .tag-low { background: #e8f5e9; color: #2e7d32; }
+  .tag-quick { background: #e3f2fd; color: #1565c0; }
+  .tag-strategic { background: #f3e5f5; color: #7b1fa2; }
+  ul { margin: 0.5rem 0 1rem 1.5rem; }
+  li { margin-bottom: 0.4rem; }
+  .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.85rem; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>SEO Audit Report</h1>
+<p class="subtitle">quickstats.tools &mdash; Generated 23 March 2026</p>
+
+<!-- ============================== EXECUTIVE SUMMARY ============================== -->
+<h2>Executive Summary</h2>
+<div class="exec-summary">
+  <p><span class="score-badge yellow">Needs Work</span> <strong>Overall SEO health: significant opportunities exist.</strong></p>
+  <p>QuickStats has a genuinely compelling product &mdash; a fully browser-based statistical analysis tool powered by R/WebAssembly with zero data upload. However, the website currently ships as a <strong>single-page Shinylive application</strong> with almost no search-engine-visible content. The HTML contains no meta description, no Open Graph tags, no structured data, no sitemap, no robots.txt, and only a single generic title tag (<code>Statistical Analysis &mdash; Shinylive</code>). Search engines see very little indexable text because all content is rendered dynamically inside WebAssembly.</p>
+  <p><strong>Biggest strength:</strong> Unique privacy-first value proposition (no data leaves the browser) and advanced feature set (Cox regression, mixed models) that competitors lack in a free browser tool.</p>
+  <p><strong>Top 3 priorities:</strong></p>
+  <ol>
+    <li>Add proper meta tags, structured data, and a keyword-rich landing page with static HTML content</li>
+    <li>Create individual pages for each analysis type (regression, Table 1, etc.) to capture long-tail keyword traffic</li>
+    <li>Add robots.txt, XML sitemap, and Open Graph tags for crawlability and social sharing</li>
+  </ol>
+</div>
+
+<!-- ============================== KEYWORD OPPORTUNITIES ============================== -->
+<h2>Keyword Opportunity Table</h2>
+<p>Based on search landscape analysis of your niche. Sorted by opportunity score.</p>
+
+<table>
+<thead>
+  <tr><th>Keyword</th><th>Est. Difficulty</th><th>Opportunity</th><th>Current Ranking</th><th>Intent</th><th>Recommended Content</th></tr>
+</thead>
+<tbody>
+  <tr><td>free online regression calculator</td><td>Moderate</td><td><span class="tag tag-high">High</span></td><td>Page 1–2</td><td>Transactional</td><td>Dedicated landing page</td></tr>
+  <tr><td>online statistics calculator no download</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Transactional</td><td>Homepage + feature pages</td></tr>
+  <tr><td>browser-based statistical analysis tool</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Commercial</td><td>Landing page / blog post</td></tr>
+  <tr><td>free Table 1 generator statistics</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Transactional</td><td>Dedicated feature page</td></tr>
+  <tr><td>logistic regression calculator online free</td><td>Moderate</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Transactional</td><td>Dedicated feature page</td></tr>
+  <tr><td>Cox regression online calculator</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Transactional</td><td>Dedicated feature page</td></tr>
+  <tr><td>private statistics tool no data upload</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Commercial</td><td>Homepage / privacy page</td></tr>
+  <tr><td>mixed effects model calculator online</td><td>Easy</td><td><span class="tag tag-high">High</span></td><td>Not ranking</td><td>Transactional</td><td>Dedicated feature page</td></tr>
+  <tr><td>free descriptive statistics calculator</td><td>Hard</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page</td></tr>
+  <tr><td>run R in browser statistics</td><td>Easy</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Informational</td><td>Blog post / how-to guide</td></tr>
+  <tr><td>SPSS alternative free online</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Commercial</td><td>Comparison landing page</td></tr>
+  <tr><td>Stata alternative free browser</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Commercial</td><td>Comparison landing page</td></tr>
+  <tr><td>publication ready Table 1 statistics</td><td>Easy</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Informational</td><td>Tutorial / blog post</td></tr>
+  <tr><td>WebAssembly statistics tool</td><td>Easy</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Informational</td><td>Blog post / technical page</td></tr>
+  <tr><td>forest plot generator online</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page</td></tr>
+  <tr><td>survival analysis online calculator</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page</td></tr>
+  <tr><td>chi-square test calculator free</td><td>Hard</td><td><span class="tag tag-low">Low</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page (long-term)</td></tr>
+  <tr><td>how to create Table 1 for research paper</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Informational</td><td>Tutorial blog post</td></tr>
+  <tr><td>ANOVA calculator online</td><td>Hard</td><td><span class="tag tag-low">Low</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page (long-term)</td></tr>
+  <tr><td>linear regression calculator with confidence intervals</td><td>Moderate</td><td><span class="tag tag-med">Medium</span></td><td>Not ranking</td><td>Transactional</td><td>Feature page</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== ON-PAGE ISSUES ============================== -->
+<h2>On-Page SEO Issues</h2>
+
+<table>
+<thead>
+  <tr><th>Page / Element</th><th>Issue</th><th>Severity</th><th>Recommended Fix</th></tr>
+</thead>
+<tbody>
+  <tr><td>Title tag</td><td>"Statistical Analysis — Shinylive" is generic, doesn't mention QuickStats brand or key features</td><td class="severity-critical">Critical</td><td>Change to: <code>QuickStats — Free Online Regression &amp; Statistics Calculator | No Data Upload</code></td></tr>
+  <tr><td>Meta description</td><td>Completely missing</td><td class="severity-critical">Critical</td><td>Add: <code>&lt;meta name="description" content="Run linear, logistic, Cox &amp; mixed-effects regression plus Table 1 descriptive statistics free in your browser. No installation, no sign-up, no data uploaded. Powered by R &amp; WebAssembly."&gt;</code></td></tr>
+  <tr><td>H1 tag</td><td>No H1 tag exists in the static HTML — all headings are rendered dynamically by Shiny</td><td class="severity-critical">Critical</td><td>Add a static <code>&lt;h1&gt;</code> above the Shiny app: "Free Online Statistical Analysis — Regression, Table 1 &amp; More"</td></tr>
+  <tr><td>Open Graph tags</td><td>Completely missing — links shared on social media/Slack show no preview</td><td class="severity-high">High</td><td>Add og:title, og:description, og:image, og:url, twitter:card tags</td></tr>
+  <tr><td>Canonical tag</td><td>Missing — risk of duplicate content between quickstats.tools and GitHub Pages URL</td><td class="severity-high">High</td><td>Add <code>&lt;link rel="canonical" href="https://quickstats.tools/"&gt;</code></td></tr>
+  <tr><td>Static text content</td><td>Page body contains zero static text — only a Shiny script tag. Search engines see an empty page.</td><td class="severity-critical">Critical</td><td>Add a static HTML landing section with feature descriptions, use cases, and keywords before the Shiny app loads</td></tr>
+  <tr><td>Image alt text</td><td>No images in the static HTML (Shiny renders everything via JS)</td><td class="severity-medium">Medium</td><td>When adding a landing page, include screenshots with descriptive alt text</td></tr>
+  <tr><td>Internal links</td><td>No internal link structure — single-page app with no subpages</td><td class="severity-high">High</td><td>Create feature pages (/regression, /table-1, /survival-analysis) and interlink them</td></tr>
+  <tr><td>Favicon</td><td>No favicon detected</td><td class="severity-medium">Medium</td><td>Add a favicon for brand recognition in browser tabs and search results</td></tr>
+  <tr><td>URL: /edit/index.html</td><td>Editor redirect page has title "Redirect to editable app" — crawlable junk</td><td class="severity-low">Low</td><td>Add <code>&lt;meta name="robots" content="noindex"&gt;</code> to this page</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== CONTENT GAP ANALYSIS ============================== -->
+<h2>Content Gap Analysis</h2>
+<p>Competitors like <strong>DATAtab</strong> (datatab.net), <strong>SocSciStatistics</strong>, and <strong>StatsKingdom</strong> rank for hundreds of keywords by having dedicated pages for each statistical test. QuickStats has <em>one page</em>.</p>
+
+<table>
+<thead>
+  <tr><th>Content Gap</th><th>Why It Matters</th><th>Format</th><th>Priority</th><th>Effort</th></tr>
+</thead>
+<tbody>
+  <tr><td>Individual calculator pages (regression, t-test, ANOVA, chi-square, etc.)</td><td>Competitors rank for dozens of "[test] calculator online" queries; each page is a separate ranking opportunity</td><td>Feature landing pages with app deep-links</td><td><span class="tag tag-high">High</span></td><td>Moderate (half day per page)</td></tr>
+  <tr><td>Static marketing homepage / landing page</td><td>Search engines currently see an empty page; all your selling points are invisible to Google</td><td>Rich HTML landing page above the Shiny app</td><td><span class="tag tag-high">High</span></td><td>Moderate (half day)</td></tr>
+  <tr><td>"How to" tutorial content</td><td>"How to run logistic regression", "how to make Table 1" drive informational traffic that converts to users</td><td>Blog posts / guides</td><td><span class="tag tag-high">High</span></td><td>Moderate per post</td></tr>
+  <tr><td>Comparison pages (QuickStats vs SPSS, vs Stata, vs DATAtab)</td><td>High commercial intent — users searching for alternatives are ready to switch</td><td>Comparison landing pages</td><td><span class="tag tag-med">Medium</span></td><td>Moderate per page</td></tr>
+  <tr><td>Privacy / security page</td><td>Your biggest differentiator (no data upload) needs its own SEO-optimized page</td><td>Dedicated page</td><td><span class="tag tag-med">Medium</span></td><td>Quick win (1–2 hrs)</td></tr>
+  <tr><td>Use-case pages (for clinicians, for students, for researchers)</td><td>Audience-specific pages capture intent-qualified traffic</td><td>Landing pages</td><td><span class="tag tag-med">Medium</span></td><td>Moderate</td></tr>
+  <tr><td>Glossary / reference (statistical terms)</td><td>SocSciStatistics and StatsKingdom rank for hundreds of definitional queries</td><td>Glossary section</td><td><span class="tag tag-low">Low</span></td><td>Substantial</td></tr>
+  <tr><td>Changelog / updates page</td><td>Signals freshness to Google; gives returning users a reason to check back</td><td>Blog/changelog</td><td><span class="tag tag-low">Low</span></td><td>Quick win</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== TECHNICAL SEO ============================== -->
+<h2>Technical SEO Checklist</h2>
+
+<table>
+<thead>
+  <tr><th>Check</th><th>Status</th><th>Details</th></tr>
+</thead>
+<tbody>
+  <tr><td>HTTPS</td><td class="status-pass">Pass</td><td>Site served over HTTPS via Vercel</td></tr>
+  <tr><td>Mobile viewport</td><td class="status-pass">Pass</td><td><code>&lt;meta name="viewport"&gt;</code> is present</td></tr>
+  <tr><td>Character encoding</td><td class="status-pass">Pass</td><td>UTF-8 declared</td></tr>
+  <tr><td>Language attribute</td><td class="status-pass">Pass</td><td><code>lang="en"</code> on HTML tag</td></tr>
+  <tr><td>robots.txt</td><td class="status-fail">Fail</td><td>No robots.txt found in /docs. Search engines have no crawl directives.</td></tr>
+  <tr><td>XML Sitemap</td><td class="status-fail">Fail</td><td>No sitemap.xml found. Google cannot discover pages efficiently.</td></tr>
+  <tr><td>Canonical tag</td><td class="status-fail">Fail</td><td>No canonical URL specified. Risk of duplicate content with GitHub Pages mirror (jimbono4-cpu.github.io).</td></tr>
+  <tr><td>Structured data (Schema.org)</td><td class="status-fail">Fail</td><td>No structured data. Missing opportunities for SoftwareApplication, FAQPage, and WebApplication schema.</td></tr>
+  <tr><td>Open Graph / Twitter Cards</td><td class="status-fail">Fail</td><td>No social meta tags. Shared links show no preview image or description.</td></tr>
+  <tr><td>Favicon</td><td class="status-fail">Fail</td><td>No favicon file found. Browser tabs show generic icon.</td></tr>
+  <tr><td>Page speed (initial load)</td><td class="status-warn">Warning</td><td>~45 second initial load due to WebR/WASM download. This is acceptable for an app but bad if it's the only page — a fast static landing page should load first.</td></tr>
+  <tr><td>Indexable content</td><td class="status-fail">Fail</td><td>All content is rendered via JavaScript/WebAssembly. Googlebot sees virtually no text content on the page.</td></tr>
+  <tr><td>Duplicate URLs</td><td class="status-warn">Warning</td><td>Site accessible at both quickstats.tools AND jimbono4-cpu.github.io/quickstats. Without canonical tags, Google may index the wrong one.</td></tr>
+  <tr><td>Mobile-friendliness</td><td class="status-warn">Warning</td><td>README notes "Best on desktop" — WebAssembly is memory-intensive. Consider adding a mobile-friendly static info page.</td></tr>
+  <tr><td>Broken links</td><td class="status-pass">Pass</td><td>No external links in the static HTML to break.</td></tr>
+  <tr><td>Redirect chain: /edit/</td><td class="status-warn">Warning</td><td>/edit/index.html uses a meta refresh redirect — should use noindex or proper 301.</td></tr>
+</tbody>
+</table>
+
+<!-- ============================== COMPETITOR COMPARISON ============================== -->
+<h2>Competitor SEO Comparison</h2>
+
+<table>
+<thead>
+  <tr><th>Dimension</th><th>QuickStats</th><th>DATAtab.net</th><th>SocSciStatistics</th><th>StatsKingdom</th></tr>
+</thead>
+<tbody>
+  <tr><td><strong>Indexable pages</strong></td><td>1</td><td>100+</td><td>40+</td><td>50+</td></tr>
+  <tr><td><strong>Monthly traffic (est.)</strong></td><td>Minimal</td><td>High (formerly DATAtab)</td><td>Moderate</td><td>~335K visits</td></tr>
+  <tr><td><strong>Meta descriptions</strong></td><td>Missing</td><td>Present on all pages</td><td>Present on all pages</td><td>Present on all pages</td></tr>
+  <tr><td><strong>Structured data</strong></td><td>None</td><td>Yes (SoftwareApp, FAQ)</td><td>Limited</td><td>Limited</td></tr>
+  <tr><td><strong>Content depth per page</strong></td><td>Zero static text</td><td>500–2000 words/page</td><td>200–500 words/page</td><td>300–1000 words/page</td></tr>
+  <tr><td><strong>Individual test pages</strong></td><td>None</td><td>Yes (each test has its own page)</td><td>Yes (40+ test pages)</td><td>Yes (50+ test pages)</td></tr>
+  <tr><td><strong>Blog / tutorials</strong></td><td>None</td><td>Yes (extensive)</td><td>No</td><td>Some</td></tr>
+  <tr><td><strong>Privacy advantage</strong></td><td><strong>Winner — zero upload</strong></td><td>Data uploaded to server</td><td>Data uploaded</td><td>Client-side for some</td></tr>
+  <tr><td><strong>Feature depth</strong></td><td><strong>Winner — Cox, mixed models, forest plots</strong></td><td>Good but simpler</td><td>Basic tests only</td><td>Good range</td></tr>
+  <tr><td><strong>Social sharing preview</strong></td><td>None (no OG tags)</td><td>Rich previews</td><td>Basic</td><td>Basic</td></tr>
+  <tr><td><strong>Sitemap</strong></td><td>Missing</td><td>Present</td><td>Present</td><td>Present</td></tr>
+</tbody>
+</table>
+
+<p><strong>Key takeaway:</strong> QuickStats has the strongest <em>product</em> (privacy, advanced models, publication-ready output) but the weakest <em>SEO presence</em> by a wide margin. Every competitor has 40–100× more indexable pages.</p>
+
+<!-- ============================== ACTION PLAN ============================== -->
+<h2>Prioritised Action Plan</h2>
+
+<div class="action-section">
+<h3><span class="tag tag-quick">Quick Wins</span> Do This Week (under 2 hours each)</h3>
+
+<table>
+<thead><tr><th>#</th><th>Action</th><th>Impact</th><th>Effort</th></tr></thead>
+<tbody>
+  <tr><td>1</td><td><strong>Fix the title tag.</strong> Change from "Statistical Analysis — Shinylive" to "QuickStats — Free Online Regression &amp; Statistics Calculator | No Data Upload"</td><td><span class="tag tag-high">High</span></td><td>5 min</td></tr>
+  <tr><td>2</td><td><strong>Add a meta description.</strong> "Run linear, logistic, Cox &amp; mixed-effects regression plus publication-ready Table 1 — free in your browser. No install, no sign-up, your data never leaves your device."</td><td><span class="tag tag-high">High</span></td><td>5 min</td></tr>
+  <tr><td>3</td><td><strong>Add Open Graph + Twitter Card tags.</strong> og:title, og:description, og:image (use a screenshot of the app), og:url, twitter:card=summary_large_image</td><td><span class="tag tag-high">High</span></td><td>15 min</td></tr>
+  <tr><td>4</td><td><strong>Add a canonical tag</strong> pointing to https://quickstats.tools/ to prevent duplicate indexing with GitHub Pages.</td><td><span class="tag tag-high">High</span></td><td>5 min</td></tr>
+  <tr><td>5</td><td><strong>Create robots.txt</strong> in /docs: Allow all, point to sitemap, disallow /edit/</td><td><span class="tag tag-med">Medium</span></td><td>10 min</td></tr>
+  <tr><td>6</td><td><strong>Create a basic sitemap.xml</strong> in /docs listing the homepage URL.</td><td><span class="tag tag-med">Medium</span></td><td>10 min</td></tr>
+  <tr><td>7</td><td><strong>Add noindex to /edit/index.html</strong> — it's a redirect page that shouldn't appear in search results.</td><td><span class="tag tag-low">Low</span></td><td>5 min</td></tr>
+  <tr><td>8</td><td><strong>Add a favicon.</strong> Create a simple icon for brand recognition in browser tabs and search results.</td><td><span class="tag tag-low">Low</span></td><td>30 min</td></tr>
+  <tr><td>9</td><td><strong>Add SoftwareApplication schema.</strong> JSON-LD structured data describing QuickStats as a free web application for statistical analysis.</td><td><span class="tag tag-med">Medium</span></td><td>20 min</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="action-section">
+<h3><span class="tag tag-strategic">Strategic Investments</span> Plan for This Quarter</h3>
+
+<table>
+<thead><tr><th>#</th><th>Action</th><th>Impact</th><th>Effort</th><th>Dependencies</th></tr></thead>
+<tbody>
+  <tr><td>1</td><td><strong>Build a static HTML landing page</strong> above the Shiny app. Include a hero section, feature highlights, screenshots with alt text, use cases, and a "Launch App" button. This gives Google actual content to index while users wait for the Shiny app to load.</td><td><span class="tag tag-high">High</span></td><td>1–2 days</td><td>None</td></tr>
+  <tr><td>2</td><td><strong>Create dedicated feature pages</strong> for each analysis type: /regression, /logistic-regression, /cox-regression, /mixed-models, /table-1, /survival-analysis. Each page should have 500+ words of explanatory content, screenshots, and a "Try it now" link to the app.</td><td><span class="tag tag-high">High</span></td><td>3–5 days total</td><td>Landing page (#1)</td></tr>
+  <tr><td>3</td><td><strong>Write 5–10 tutorial blog posts.</strong> Topics: "How to run logistic regression online", "How to create a Table 1 for your research paper", "Free alternatives to SPSS for students", "How to run a Cox regression without installing R".</td><td><span class="tag tag-high">High</span></td><td>1–2 days per post</td><td>Blog setup</td></tr>
+  <tr><td>4</td><td><strong>Create comparison pages</strong> — "QuickStats vs SPSS", "QuickStats vs DATAtab", "QuickStats vs Stata". Highlight your privacy and zero-install advantage.</td><td><span class="tag tag-med">Medium</span></td><td>Half day per page</td><td>Landing page (#1)</td></tr>
+  <tr><td>5</td><td><strong>Set up Google Search Console</strong> and submit your sitemap. Monitor indexing status and crawl errors.</td><td><span class="tag tag-high">High</span></td><td>30 min</td><td>Sitemap (#6 from Quick Wins)</td></tr>
+  <tr><td>6</td><td><strong>Build backlinks</strong> by sharing QuickStats on academic subreddits (r/statistics, r/AcademicPsychology), ResearchGate, medical education forums, and Twitter/X stats community.</td><td><span class="tag tag-med">Medium</span></td><td>Ongoing</td><td>Landing page (#1)</td></tr>
+  <tr><td>7</td><td><strong>Add a "loading" landing experience</strong> — while the 45-second WebR download happens, show the static landing page content instead of a blank screen. This improves both SEO and user experience.</td><td><span class="tag tag-med">Medium</span></td><td>Half day</td><td>Landing page (#1)</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================== FOLLOW-UP ============================== -->
+<h2>Recommended Next Steps</h2>
+<p>Based on this audit, the highest-impact actions I can help you implement right now are:</p>
+<ul>
+  <li><strong>Fix the quick wins</strong> — I can update your index.html with the correct title, meta description, OG tags, canonical tag, and structured data right now</li>
+  <li><strong>Create robots.txt and sitemap.xml</strong> — I can generate these files immediately</li>
+  <li><strong>Draft a static landing page section</strong> — I can write keyword-rich HTML content to insert above your Shiny app</li>
+  <li><strong>Write content briefs</strong> for the top keyword opportunities</li>
+  <li><strong>Build a content calendar</strong> based on the gap analysis</li>
+</ul>
+
+<div class="footer">
+  <p>SEO Audit generated for quickstats.tools — March 2026. Data sourced from web search analysis, local source code review, and competitor benchmarking.</p>
+</div>
+
+</body>
+</html>
