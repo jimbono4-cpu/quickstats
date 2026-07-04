@@ -210,7 +210,7 @@
       <p style="font-size:17px; max-width:480px; text-align:center; line-height:1.5; opacity:0.95;">Starting the analysis engine&hellip;<br>This tool runs R directly in your browser using WebR. The first load takes about 30&ndash;60 seconds while the analysis environment starts. After this, loading will be much faster.</p>
       <div class="preloader-bar"><div class="preloader-bar-fill" id="pbar"></div></div>
       <div class="preloader-pct" id="ppct">0%</div>
-      <div class="preloader-status" id="pstatus">Connecting...</div>
+      <div class="preloader-status" id="pstatus" role="status" aria-live="polite">Connecting...</div>
       <p style="font-size:13px; margin-top:24px; opacity:0.55;">All analysis runs locally in your browser &mdash; your data never leaves your computer.</p>
     </div>
     <script>
@@ -219,8 +219,33 @@
       var pctEl = document.getElementById("ppct");
       var statusEl = document.getElementById("pstatus");
       var done = false;
+      var failed = false;
       var startTime = Date.now();
       var expectedMs = 45000;
+      var timeoutMs = 150000; /* give up after 2.5 minutes */
+
+      function showLoadFailure(msg) {
+        if (done || failed) return;
+        failed = true;
+        var pre = document.getElementById("preloader");
+        if (!pre) return;
+        pre.innerHTML =
+          '<h1>QuickStats could not start</h1>' +
+          '<p style="font-size:15px; max-width:480px; text-align:center; line-height:1.6;">' + msg + '</p>' +
+          '<p style="font-size:14px; max-width:480px; text-align:center; line-height:1.6; opacity:0.85;">' +
+          'QuickStats needs a modern browser with WebAssembly support ' +
+          '(Chrome 89+, Firefox 89+, Edge 89+, Safari 16.4+) and a working internet ' +
+          'connection for the first load.</p>' +
+          '<button onclick="location.reload()" style="margin-top:18px; padding:10px 24px; ' +
+          'font-size:15px; border:none; border-radius:6px; cursor:pointer; ' +
+          'background:white; color:#667eea; font-weight:600;">Try again</button>';
+      }
+
+      /* Browsers without WebAssembly can never load the app — say so immediately */
+      if (typeof WebAssembly !== "object") {
+        showLoadFailure("Your browser does not support WebAssembly, which QuickStats needs to run R locally.");
+        return;
+      }
 
       var stages = [
         { at: 0,  lbl: "Connecting..." },
@@ -240,8 +265,12 @@
       }
 
       function tick() {
-        if (done) return;
+        if (done || failed) return;
         var elapsed = Date.now() - startTime;
+        if (elapsed > timeoutMs) {
+          showLoadFailure("The analysis engine did not finish loading. This can happen on a slow or interrupted connection, or if your browser ran out of memory.");
+          return;
+        }
         var t = Math.min(elapsed / expectedMs, 1);
         var pct = Math.round(99 * (1 - Math.pow(1 - t, 1.8)));
         if (pct > 99) pct = 99;
@@ -277,7 +306,7 @@
       }
 
       function checkShinyReady() {
-        if (done) return;
+        if (done || failed) return;
         var root = document.getElementById("root");
         /* Method 1: loading-wrapper is gone (Shinylive removed it) */
         var lw = root ? root.querySelector(".loading-wrapper") : null;
@@ -303,10 +332,10 @@
     })();
     </script>
     <div class="feedback-link" id="feedbackLink">
-      <a href="https://github.com/jimbono4-cpu/Drafts-06.02.2026/issues/new" target="_blank" rel="noopener">Feedback &amp; Bug Reports</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats/issues/new" target="_blank" rel="noopener">Feedback &amp; Bug Reports</a>
     </div>
     <div class="feedback-link" id="starLink" style="right:200px;">
-      <a href="https://github.com/jimbono4-cpu/Drafts-06.02.2026" target="_blank" rel="noopener">&#11088; Star on GitHub</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" target="_blank" rel="noopener">&#11088; Star on GitHub</a>
     </div>
     <script data-goatcounter="https://jimbono4.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>

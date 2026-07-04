@@ -9,3 +9,12 @@ __pycache__/
 
 # Shinylive cache (large binary assets, downloaded at export time)
 .shinylive/
+
+# Local data files — never publish datasets from the working directory
+*.dta
+*.sav
+*.sas7bdat
+example data.csv
+https.docx
+fix-email.sh
+*.patch

@@ -33,7 +33,7 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sa
 ### Step 2 — Explore Data
 - View variable distributions with histograms and bar charts
 - Inspect missing data patterns
-- Set variable types (continuous, categorical) and apply labels
+- Apply variable labels that carry through to Table 1 and regression output (variable types are detected automatically)
 - Normality testing (Shapiro-Wilk)
 
 <img width="1554" height="887" alt="image" src="https://github.com/user-attachments/assets/b2d12b02-14b3-4893-a1ac-6b603cb04291" />
@@ -73,12 +73,11 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sa
 <img width="1815" height="1021" alt="image" src="https://github.com/user-attachments/assets/5e5833d2-3151-407d-83a5-ed7f1d3d90cc" />
 
 Additional features:
-- **Cluster-robust standard errors** (sandwich estimator)
+- **Cluster-robust standard errors** (sandwich estimator) for linear and logistic models
 - **VIF** for multicollinearity diagnostics
 - **Marginal means** (emmeans) for factor predictors
 - **All models automatically generate forest plots** of coefficients, odds ratios, or hazard ratios
 - Automatic generation of plots depending on model chosen. For example, survival plots with option to stratify if you choose Cox model 
-- **Diagnostic plots** — residuals vs fitted, Q-Q plots, Cook's distance
 - **Exposure vs outcome** scatter plots with regression lines
 - Automatic confidence intervals and exponentiation for logistic/Cox models
 - Complete-case analysis with transparent missing data reporting
@@ -106,7 +105,7 @@ Additional features:
 
 ### R packages used
 
-`ggplot2` · `broom` · `survival` · `sandwich` · `lmtest` · `car` · `emmeans` · `lme4` · `nlme` · `haven` · `readxl` · `writexl` · `gridExtra` · `base64enc`
+`ggplot2` · `broom` · `survival` · `sandwich` · `lmtest` · `car` · `emmeans` · `lme4` · `nlme` · `haven` · `readxl` · `writexl` · `gridExtra`
 
 ---
 Completely free statistical analysis tool
@@ -120,4 +119,4 @@ Completely free statistical analysis tool
 
 ## License
 
-This project is provided for academic and research use.
+MIT — see [LICENSE](LICENSE).

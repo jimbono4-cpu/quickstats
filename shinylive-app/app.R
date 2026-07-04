@@ -124,6 +124,71 @@ prepare_model_data <- function(df, var_types) {
   df
 }
 
+#' Coerce an outcome/event variable to numeric 0/1 for logistic/Cox models.
+#' Returns list(values = numeric 0/1 vector, event_label = level coded as 1),
+#' or NULL when the variable has more than two distinct non-missing values.
+to_binary01 <- function(x) {
+  if (is.logical(x)) {
+    return(list(values = as.numeric(x), event_label = "TRUE"))
+  }
+  if (is.numeric(x)) {
+    vals <- sort(unique(na.omit(x)))
+    if (length(vals) < 1 || length(vals) > 2) return(NULL)
+    if (all(vals %in% c(0, 1))) {
+      return(list(values = as.numeric(x), event_label = "1"))
+    }
+    return(list(values = as.numeric(x == vals[length(vals)]),
+                event_label = as.character(vals[length(vals)])))
+  }
+  f <- factor(x)
+  if (nlevels(f) != 2) return(NULL)
+  list(values = as.numeric(f) - 1, event_label = levels(f)[2])
+}
+
+#' Translate common R model-fitting errors into plain language for
+#' non-R-using researchers. Unrecognised messages pass through unchanged.
+friendly_model_error <- function(msg) {
+  patterns <- list(
+    c("0 \\(non-NA\\) cases|no observations informative",
+      "The model has no complete rows to fit. Check that the outcome and predictors are not empty or entirely missing."),
+    c("contrasts can be applied only to factors",
+      "One of the categorical predictors has only a single level once rows with missing values are removed, so it cannot be used. Remove it from the predictors."),
+    c("variable lengths differ",
+      "The selected variables have different lengths - this usually means the dataset changed after the selections were made. Re-select the variables and refit."),
+    c("exactly singular|singular fit|rank[- ]deficient",
+      "Some predictors are perfectly correlated with each other (or with the outcome), so the model cannot be estimated. Remove one of the overlapping predictors."),
+    c("invalid survival|Invalid status|Surv\\(",
+      "The survival outcome could not be built. Check that the time variable is numeric and the event variable has two levels (e.g. 0/1 or No/Yes)."),
+    c("NA/NaN/Inf in",
+      "The data contain values the model cannot use (e.g. infinite or non-numeric values). Review the selected variables in Step 2.")
+  )
+  for (p in patterns) {
+    if (grepl(p[1], msg, ignore.case = TRUE)) {
+      return(paste0(p[2], " [Technical detail: ", msg, "]"))
+    }
+  }
+  msg
+}
+
+#' Pure-R base64 encoder for raw vectors (replaces the base64enc dependency,
+#' which is not vendored in the WebR package bundle and would otherwise be
+#' fetched from a CDN at runtime).
+b64encode_raw <- function(raw_vec) {
+  b64chars <- c(LETTERS, letters, as.character(0:9), "+", "/")
+  n <- length(raw_vec)
+  if (n == 0) return("")
+  pad <- (3L - n %% 3L) %% 3L
+  x <- as.integer(c(raw_vec, as.raw(rep(0L, pad))))
+  m <- matrix(x, nrow = 3L)
+  i1 <- m[1, ] %/% 4L
+  i2 <- (m[1, ] %% 4L) * 16L + m[2, ] %/% 16L
+  i3 <- (m[2, ] %% 16L) * 4L + m[3, ] %/% 64L
+  i4 <- m[3, ] %% 64L
+  out <- b64chars[rbind(i1, i2, i3, i4) + 1L]
+  if (pad > 0) out[(length(out) - pad + 1L):length(out)] <- "="
+  paste(out, collapse = "")
+}
+
 #' Safe file reader — detects format from extension
 #' Installs haven/readxl on-demand if not yet available (background install
 #' may still be running when user uploads a non-CSV file).
@@ -612,21 +677,45 @@ table1_server <- function(id, shared) {
           group_col_names <- paste0(by_var, ": ", groups, " (N=", group_n, ")")
         }
         overall_col_name <- paste0("Overall (N=", n_total, ")")
+        tests_used <- character(0)  # for the table footnote
 
         for (v in analysis_vars) {
           is_cat <- is.factor(df_sub[[v]]) || is.character(df_sub[[v]]) ||
                     (!is.null(vt) && v %in% vt$variable && vt$type[vt$variable == v] == "categorical")
+          n_miss_v <- sum(is.na(df_sub[[v]]))
           if (is_cat) {
             # Categorical variable
             lvls <- if (is.factor(df_sub[[v]])) levels(df_sub[[v]]) else sort(unique(na.omit(df_sub[[v]])))
-            # Header row for this variable
+            # Header row for this variable (carries the p-value)
             row <- list(Variable = paste0("**", v, "**"), Statistic = "n (%)")
             if (!is.null(groups)) {
               for (gi in seq_along(groups)) row[[group_col_names[gi]]] <- ""
             }
             row[[overall_col_name]] <- ""
+            if (input$add_p && !is.null(by_var)) {
+              tbl_test <- table(df_sub[[v]], df_sub[[by_var]])
+              p_val <- tryCatch({
+                # Use Fisher's exact test when expected cell counts are small
+                # (chi-squared approximation unreliable); chi-squared otherwise.
+                exp_counts <- suppressWarnings(chisq.test(tbl_test)$expected)
+                if (any(exp_counts < 5)) {
+                  tests_used <- c(tests_used, "Fisher's exact test")
+                  if (all(dim(tbl_test) == 2)) {
+                    fisher.test(tbl_test)$p.value
+                  } else {
+                    fisher.test(tbl_test, simulate.p.value = TRUE, B = 2000)$p.value
+                  }
+                } else {
+                  tests_used <- c(tests_used, "chi-squared test")
+                  suppressWarnings(chisq.test(tbl_test)$p.value)
+                }
+              }, error = function(e) NA)
+              row[["p-value"]] <- if (!is.na(p_val)) {
+                if (p_val < 0.001) "<0.001" else as.character(round(p_val, 3))
+              } else ""
+            }
             rows <- c(rows, list(row))
-            # Level rows
+            # Level rows — percentages among non-missing observations
             for (lv in lvls) {
               row <- list(Variable = paste0("    ", lv), Statistic = "")
               if (!is.null(groups)) {
@@ -634,24 +723,16 @@ table1_server <- function(id, shared) {
                   g <- groups[gi]
                   sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
                   n_lv <- sum(sub[[v]] == lv, na.rm = TRUE)
-                  pct <- round(100 * n_lv / nrow(sub), 1)
+                  denom <- sum(!is.na(sub[[v]]))
+                  pct <- if (denom > 0) round(100 * n_lv / denom, 1) else 0
                   row[[group_col_names[gi]]] <- paste0(n_lv, " (", pct, "%)")
                 }
               }
               n_lv_all <- sum(df_sub[[v]] == lv, na.rm = TRUE)
-              pct_all <- round(100 * n_lv_all / n_total, 1)
+              denom_all <- sum(!is.na(df_sub[[v]]))
+              pct_all <- if (denom_all > 0) round(100 * n_lv_all / denom_all, 1) else 0
               row[[overall_col_name]] <- paste0(n_lv_all, " (", pct_all, "%)")
               rows <- c(rows, list(row))
-            }
-            # p-value row for categorical
-            if (input$add_p && !is.null(by_var)) {
-              p_val <- tryCatch({
-                tbl_test <- table(df_sub[[v]], df_sub[[by_var]])
-                chisq.test(tbl_test)$p.value
-              }, error = function(e) NA)
-              rows[[length(rows)]][["p-value"]] <- if (!is.na(p_val)) {
-                if (p_val < 0.001) "<0.001" else as.character(round(p_val, 3))
-              } else ""
             }
           } else {
             # Continuous variable
@@ -679,17 +760,44 @@ table1_server <- function(id, shared) {
               p_val <- tryCatch({
                 n_groups <- length(groups)
                 if (is_nonnormal) {
-                  if (n_groups == 2) wilcox.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
-                  else kruskal.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  if (n_groups == 2) {
+                    tests_used <- c(tests_used, "Wilcoxon rank-sum test")
+                    wilcox.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  } else {
+                    tests_used <- c(tests_used, "Kruskal-Wallis test")
+                    kruskal.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  }
                 } else {
-                  if (n_groups == 2) t.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
-                  else summary(aov(df_sub[[v]] ~ df_sub[[by_var]]))[[1]][["Pr(>F)"]][1]
+                  if (n_groups == 2) {
+                    tests_used <- c(tests_used, "t-test")
+                    t.test(df_sub[[v]] ~ df_sub[[by_var]])$p.value
+                  } else {
+                    tests_used <- c(tests_used, "one-way ANOVA")
+                    summary(aov(df_sub[[v]] ~ df_sub[[by_var]]))[[1]][["Pr(>F)"]][1]
+                  }
                 }
               }, error = function(e) NA)
               row[["p-value"]] <- if (!is.na(p_val)) {
                 if (p_val < 0.001) "<0.001" else as.character(round(p_val, 3))
               } else ""
             }
+            rows <- c(rows, list(row))
+          }
+
+          # Missing-data row for this variable (transparent missing reporting)
+          if (n_miss_v > 0) {
+            row <- list(Variable = "    Missing", Statistic = "n (%)")
+            if (!is.null(groups)) {
+              for (gi in seq_along(groups)) {
+                g <- groups[gi]
+                sub <- df_sub[df_sub[[by_var]] == g, , drop = FALSE]
+                n_m <- sum(is.na(sub[[v]]))
+                pct_m <- if (nrow(sub) > 0) round(100 * n_m / nrow(sub), 1) else 0
+                row[[group_col_names[gi]]] <- paste0(n_m, " (", pct_m, "%)")
+              }
+            }
+            row[[overall_col_name]] <- paste0(n_miss_v, " (",
+                                              round(100 * n_miss_v / n_total, 1), "%)")
             rows <- c(rows, list(row))
           }
         }
@@ -712,6 +820,10 @@ table1_server <- function(id, shared) {
 
         table1_obj(tbl_df)
         shared$table1 <- tbl_df
+        shared$table1_footnote <- if (length(tests_used) > 0) {
+          paste0("Statistical tests: ", paste(unique(tests_used), collapse = "; "),
+                 ". Percentages are among non-missing observations.")
+        } else NULL
         showNotification("Table 1 generated", type = "message")
       }, error = function(e) {
         showNotification(paste("Error:", conditionMessage(e)), type = "error")
@@ -725,7 +837,8 @@ table1_server <- function(id, shared) {
       }
       n_total <- if (!is.null(shared$data)) nrow(shared$data) else "?"
       title <- paste0("Table 1. Characteristics of participants (N = ", n_total, ")")
-      rendered_html <- df_to_html_table(tbl, title = title, id = ns("table1_html"))
+      rendered_html <- df_to_html_table(tbl, title = title, id = ns("table1_html"),
+                                        footnote = shared$table1_footnote)
       # Store for reuse in Step 5
       shared$table1_html <- rendered_html
       HTML(rendered_html)
@@ -783,10 +896,15 @@ model_ui <- function(id) {
               "May be slow in WebR.")
           ),
           hr(),
-          checkboxInput(ns("robust_se"), "Cluster-robust SEs (sandwich)", value = FALSE),
+          # Cluster-robust SEs are only implemented for lm/glm — hide otherwise
           conditionalPanel(
-            condition = paste0("input['", ns("robust_se"), "']"),
-            selectInput(ns("cluster_var"), "Cluster variable:", choices = NULL)
+            condition = paste0("input['", ns("model_type"), "'] == 'lm' || ",
+                               "input['", ns("model_type"), "'] == 'glm'"),
+            checkboxInput(ns("robust_se"), "Cluster-robust SEs (sandwich)", value = FALSE),
+            conditionalPanel(
+              condition = paste0("input['", ns("robust_se"), "']"),
+              selectInput(ns("cluster_var"), "Cluster variable:", choices = NULL)
+            )
           ),
           checkboxInput(ns("show_vif"), "Show VIF (multicollinearity)", value = FALSE),
           hr(),
@@ -893,25 +1011,44 @@ model_server <- function(id, shared) {
         mod <- switch(input$model_type,
           "lm" = lm(as.formula(formula_str), data = df),
           "glm" = {
-            # For logistic: ensure outcome is numeric 0/1
-            if (is.factor(df[[outcome]])) {
-              df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+            # For logistic: coerce outcome to numeric 0/1, tracking the event level
+            bin <- to_binary01(df[[outcome]])
+            if (is.null(bin)) {
+              stop(paste0("Logistic regression needs a binary outcome, but '",
+                          outcome, "' has more than two distinct values. ",
+                          "Choose a two-level variable, or use linear regression ",
+                          "for a continuous outcome."))
             }
-            if (!is.numeric(df[[outcome]]) || !all(na.omit(df[[outcome]]) %in% c(0, 1))) {
-              df[[outcome]] <- as.numeric(as.factor(df[[outcome]])) - 1
-            }
+            df[[outcome]] <- bin$values
+            showNotification(
+              paste0("Outcome '", outcome, "': level '", bin$event_label,
+                     "' is modelled as the event (coded 1)."),
+              type = "message", duration = 8)
             glm(as.formula(formula_str), data = df, family = binomial)
           },
           "cox" = {
             req(input$time_var)
             if (!requireNamespace("survival", quietly = TRUE)) stop("survival not available")
-            # Ensure time and event (outcome) variables are numeric (not factor)
+            # Time variable must be numeric
             if (is.factor(df[[input$time_var]])) {
               df[[input$time_var]] <- as.numeric(as.character(df[[input$time_var]]))
             }
-            if (is.factor(df[[outcome]])) {
-              df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+            if (all(is.na(df[[input$time_var]]))) {
+              stop(paste0("The time variable '", input$time_var,
+                          "' is not numeric. Choose a numeric follow-up time."))
             }
+            # Event variable: coerce to numeric 0/1, tracking the event level
+            bin <- to_binary01(df[[outcome]])
+            if (is.null(bin)) {
+              stop(paste0("Cox regression needs a binary event variable, but '",
+                          outcome, "' has more than two distinct values. ",
+                          "Choose a two-level event indicator (e.g. died yes/no)."))
+            }
+            df[[outcome]] <- bin$values
+            showNotification(
+              paste0("Event '", outcome, "': level '", bin$event_label,
+                     "' is modelled as the event (coded 1)."),
+              type = "message", duration = 8)
             surv_formula <- as.formula(paste(
               "survival::Surv(", input$time_var, ",", outcome, ") ~",
               paste(preds, collapse = " + ")
@@ -1040,18 +1177,38 @@ model_server <- function(id, shared) {
         }
 
         # Apply robust SEs if requested
-        if (input$robust_se && input$model_type %in% c("lm", "glm")) {
-          req(input$cluster_var)
+        robust_applied <- FALSE
+        if (isTRUE(input$robust_se) && input$model_type %in% c("lm", "glm") &&
+            !is.null(input$cluster_var) && nchar(input$cluster_var) > 0) {
           if (requireNamespace("sandwich", quietly = TRUE) &&
               requireNamespace("lmtest", quietly = TRUE)) {
-            robust <- lmtest::coeftest(mod,
-              vcov = sandwich::vcovCL(mod, cluster = df[[input$cluster_var]]))
-            tidy_df$estimate <- robust[, 1]
-            tidy_df$std.error <- robust[, 2]
-            tidy_df$statistic <- robust[, 3]
-            tidy_df$p.value <- robust[, 4]
-            tidy_df$conf.low <- tidy_df$estimate - 1.96 * tidy_df$std.error
-            tidy_df$conf.high <- tidy_df$estimate + 1.96 * tidy_df$std.error
+            robust <- tryCatch({
+              # Align the cluster vector with the rows actually used by the
+              # model (complete-case rows), otherwise vcovCL errors when any
+              # observations were dropped for missing data.
+              used_rows <- match(rownames(model.frame(mod)), rownames(df))
+              cl <- df[[input$cluster_var]][used_rows]
+              if (anyNA(cl)) {
+                stop(paste0("the cluster variable '", input$cluster_var,
+                            "' has missing values for observations used in the model"))
+              }
+              lmtest::coeftest(mod, vcov = sandwich::vcovCL(mod, cluster = cl))
+            }, error = function(e) {
+              showNotification(
+                paste0("Cluster-robust SEs could not be applied (",
+                       conditionMessage(e), "). Conventional SEs are reported."),
+                type = "warning", duration = 10)
+              NULL
+            })
+            if (!is.null(robust)) {
+              tidy_df$estimate <- robust[, 1]
+              tidy_df$std.error <- robust[, 2]
+              tidy_df$statistic <- robust[, 3]
+              tidy_df$p.value <- robust[, 4]
+              tidy_df$conf.low <- tidy_df$estimate - 1.96 * tidy_df$std.error
+              tidy_df$conf.high <- tidy_df$estimate + 1.96 * tidy_df$std.error
+              robust_applied <- TRUE
+            }
           }
         }
 
@@ -1065,7 +1222,7 @@ model_server <- function(id, shared) {
         }
 
         model_tidy(tidy_df)
-        used_robust <- isTRUE(input$robust_se) && input$model_type %in% c("lm", "glm")
+        used_robust <- robust_applied
         shared$model_result <- list(fit = mod, tidy = tidy_df, type = input$model_type,
                                     is_binary_mixed = mixed_model_binary(),
                                     used_robust_se = used_robust)
@@ -1087,7 +1244,8 @@ model_server <- function(id, shared) {
         }
 
       }, error = function(e) {
-        showNotification(paste("Model error:", conditionMessage(e)), type = "error")
+        showNotification(paste("Model error:", friendly_model_error(conditionMessage(e))),
+                         type = "error", duration = 12)
       })
     })
 
@@ -1440,8 +1598,7 @@ model_server <- function(id, shared) {
           grDevices::dev.off()
           raw <- readBin(tmp, "raw", file.info(tmp)$size)
           unlink(tmp)
-          shared$pkgs_used <- union(shared$pkgs_used, "base64enc")
-          shared$diagnostics_plot_base64 <- paste0("data:image/png;base64,", base64enc::base64encode(raw))
+          shared$diagnostics_plot_base64 <- paste0("data:image/png;base64,", b64encode_raw(raw))
         }
       }, error = function(e) {
         shared$diagnostics_plot_base64 <- NULL
@@ -1607,7 +1764,8 @@ model_server <- function(id, shared) {
               time_var <- input$time_var
               outcome <- input$outcome
               if (is.factor(df[[time_var]])) df[[time_var]] <- as.numeric(as.character(df[[time_var]]))
-              if (is.factor(df[[outcome]])) df[[outcome]] <- as.numeric(as.character(df[[outcome]]))
+              bin <- to_binary01(df[[outcome]])
+              if (!is.null(bin)) df[[outcome]] <- bin$values
               km_formula <- as.formula(paste0("survival::Surv(", time_var, ", ", outcome, ") ~ ", km_var))
               km_fit <- survival::survfit(km_formula, data = df)
               km_data <- data.frame(
@@ -1822,8 +1980,7 @@ model_server <- function(id, shared) {
         grDevices::dev.off()
         raw <- readBin(tmp, "raw", file.info(tmp)$size)
         unlink(tmp)
-        shared$pkgs_used <- union(shared$pkgs_used, "base64enc")
-        paste0("data:image/png;base64,", base64enc::base64encode(raw))
+        paste0("data:image/png;base64,", b64encode_raw(raw))
       }, error = function(e) {
         tryCatch(grDevices::dev.off(), error = function(e2) NULL)
         NULL
@@ -1860,15 +2017,15 @@ model_server <- function(id, shared) {
       session$sendCustomMessage("copyPlotToClipboard", list(data = b64))
     })
 
-    # Store base64 for report use — re-generate whenever current_plot changes
+    # Store base64 for report use — re-generate once whenever current_plot
+    # changes. (No invalidateLater here: a timer would re-render the PNG every
+    # tick for the rest of the session, burning CPU inside WASM.)
     observe({
       p <- current_plot()
       if (is.null(p)) {
         shared$plot_base64 <- NULL
         return()
       }
-      # Defer slightly so renderPlot has finished
-      invalidateLater(500)
       shared$plot_base64 <- tryCatch(get_plot_base64(), error = function(e) NULL)
     })
   })
@@ -2886,7 +3043,19 @@ results_server <- function(id, shared) {
 ui <- fluidPage(
   theme = NULL,
   tags$head(
-    tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"),
+    # html2pdf.js is vendored in docs/ so PDF export never depends on a
+    # third-party CDN at runtime. The app runs inside a shinylive iframe under
+    # a virtual /app_xxx/ path, so resolve the script URL against the parent
+    # page (the site root), which works at a domain root or under a subpath.
+    tags$script(HTML("
+      (function() {
+        var base = '/';
+        try { base = window.parent.location.href; } catch (e) {}
+        var s = document.createElement('script');
+        s.src = new URL('html2pdf.bundle.min.js', base).href;
+        document.head.appendChild(s);
+      })();
+    ")),
     tags$style(HTML("
       .step-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -3218,7 +3387,7 @@ server <- function(input, output, session) {
       all_pkgs <- c("haven", "readxl", "labelled",
                      "munsell", "ggplot2", "broom",
                      "survival", "sandwich", "lmtest", "car", "emmeans",
-                     "writexl", "lme4", "gridExtra", "base64enc")
+                     "writexl", "lme4", "gridExtra")
       for (pkg in all_pkgs) {
         install_if_needed(pkg)
       }
