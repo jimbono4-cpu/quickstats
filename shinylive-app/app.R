@@ -145,6 +145,78 @@ to_binary01 <- function(x) {
   list(values = as.numeric(f) - 1, event_label = levels(f)[2])
 }
 
+#' Coerce an outcome to a non-negative integer count for Poisson/neg-binomial
+#' models. Returns the numeric vector, or NULL if the values are not counts.
+to_count <- function(x) {
+  if (is.factor(x)) x <- suppressWarnings(as.numeric(as.character(x)))
+  if (is.character(x)) x <- suppressWarnings(as.numeric(x))
+  if (!is.numeric(x)) return(NULL)
+  vals <- na.omit(x)
+  if (length(vals) == 0) return(NULL)
+  if (any(vals < 0) || any(vals %% 1 != 0)) return(NULL)
+  as.numeric(x)
+}
+
+#' Short and full labels for exponentiated estimates, by model type
+exp_label <- function(model_type) {
+  switch(model_type, "cox" = "HR", "poisson" = "IRR", "negbin" = "IRR", "OR")
+}
+exp_label_full <- function(model_type) {
+  switch(model_type,
+         "cox" = "Hazard Ratios",
+         "poisson" = "Incidence Rate Ratios",
+         "negbin" = "Incidence Rate Ratios",
+         "Odds Ratios")
+}
+
+#' Model types whose estimates are reported on the exponentiated scale
+is_exp_model <- function(model_type, binary_mixed = FALSE) {
+  model_type %in% c("glm", "cox", "poisson", "negbin") ||
+    (model_type == "lmer" && isTRUE(binary_mixed))
+}
+
+#' AUC with Hanley-McNeil 95% CI, computed from predicted probabilities and a
+#' 0/1 outcome via the Mann-Whitney statistic (no pROC dependency).
+calc_auc <- function(pred, obs) {
+  ok <- !is.na(pred) & !is.na(obs)
+  pred <- pred[ok]; obs <- obs[ok]
+  n1 <- sum(obs == 1); n0 <- sum(obs == 0)
+  if (n1 == 0 || n0 == 0) return(NULL)
+  r <- rank(pred)
+  auc <- (sum(r[obs == 1]) - n1 * (n1 + 1) / 2) / (n1 * n0)
+  q1 <- auc / (2 - auc)
+  q2 <- 2 * auc^2 / (1 + auc)
+  se <- sqrt((auc * (1 - auc) + (n1 - 1) * (q1 - auc^2) +
+              (n0 - 1) * (q2 - auc^2)) / (n1 * n0))
+  list(auc = auc, lo = max(0, auc - 1.96 * se), hi = min(1, auc + 1.96 * se),
+       n_events = n1, n_nonevents = n0)
+}
+
+#' ROC curve coordinates (FPR, TPR) sweeping the probability threshold
+roc_points <- function(pred, obs) {
+  ok <- !is.na(pred) & !is.na(obs)
+  pred <- pred[ok]; obs <- obs[ok]
+  o <- order(pred, decreasing = TRUE)
+  data.frame(
+    fpr = c(0, cumsum(obs[o] == 0) / sum(obs == 0)),
+    tpr = c(0, cumsum(obs[o] == 1) / sum(obs == 1))
+  )
+}
+
+#' Human-readable description of the estimates a fitted model reports
+#' (used in table titles and report headings)
+estimate_description <- function(model_type, binary_mixed = FALSE) {
+  switch(model_type,
+    "lm" = "Linear regression coefficients",
+    "glm" = "Odds ratios from logistic regression",
+    "poisson" = "Incidence rate ratios from Poisson regression",
+    "negbin" = "Incidence rate ratios from negative binomial regression",
+    "cox" = "Hazard ratios from Cox proportional hazards regression",
+    "lmer" = if (isTRUE(binary_mixed)) "Odds ratios from mixed-effects logistic regression"
+             else "Mixed-effects linear regression coefficients",
+    model_type)
+}
+
 #' Translate common R model-fitting errors into plain language for
 #' non-R-using researchers. Unrecognised messages pass through unchanged.
 friendly_model_error <- function(msg) {
@@ -234,6 +306,48 @@ safe_read_data <- function(file_path, file_name) {
   })
 }
 
+#' Synthetic two-arm clinical trial dataset (n = 300), deterministic.
+#' Includes outcomes for every model type: continuous (follow-up SBP),
+#' binary (BP controlled), count (admissions), survival (time + event),
+#' plus a site variable for clustered analyses and realistic missingness.
+make_trial_example <- function(n = 300) {
+  old_seed <- if (exists(".Random.seed", envir = globalenv())) {
+    get(".Random.seed", envir = globalenv())
+  } else NULL
+  on.exit(if (!is.null(old_seed)) assign(".Random.seed", old_seed, envir = globalenv()))
+  set.seed(2026)
+
+  arm <- rep(c("Control", "Treatment"), each = n / 2)
+  age <- round(rnorm(n, 62, 11))
+  sex <- sample(c("Female", "Male"), n, replace = TRUE)
+  bmi <- round(rnorm(n, 28, 4.5), 1)
+  site <- sample(paste0("Site ", LETTERS[1:6]), n, replace = TRUE)
+  sbp_baseline <- round(rnorm(n, 152, 12))
+  treat_effect <- ifelse(arm == "Treatment", -8, 0)
+  sbp_followup <- round(sbp_baseline * 0.6 + 55 + treat_effect + rnorm(n, 0, 9))
+  admissions <- rpois(n, lambda = exp(-0.7 + 0.015 * (age - 62) +
+                                      ifelse(arm == "Treatment", -0.3, 0)))
+  event_rate <- exp(-4.2 + 0.03 * (age - 62) + ifelse(arm == "Treatment", -0.4, 0))
+  time_event <- rexp(n, event_rate)
+  time_censor <- runif(n, 6, 36)
+  cv_event <- as.numeric(time_event <= time_censor)
+  followup_months <- round(pmin(time_event, time_censor), 1)
+
+  # Realistic missingness, then derive the binary outcome so NAs propagate
+  bmi[sample(n, 12)] <- NA
+  sbp_followup[sample(n, 8)] <- NA
+  bp_controlled <- ifelse(sbp_followup < 140, "Yes", "No")
+
+  data.frame(
+    patient_id = sprintf("PT%03d", 1:n),
+    arm = arm, age = age, sex = sex, bmi = bmi, site = site,
+    sbp_baseline = sbp_baseline, sbp_followup = sbp_followup,
+    bp_controlled = bp_controlled, admissions = admissions,
+    followup_months = followup_months, cv_event = cv_event,
+    stringsAsFactors = FALSE
+  )
+}
+
 #' Generate summary statistics for a variable
 var_summary <- function(x, name = "") {
   n <- length(x)
@@ -284,6 +398,11 @@ upload_ui <- function(id) {
             "SPSS (.sav), SAS (.sas7bdat), R (.rds/.rda/.RData)"),
           hr(),
           h5("Or use example data"),
+          actionButton(ns("use_trial"), "Load clinical trial example",
+                       class = "btn-primary btn-sm"),
+          p(class = "text-muted small", style = "margin: 4px 0 8px;",
+            "Synthetic 300-patient two-arm trial: blood pressure, admissions,",
+            "and survival outcomes. Works with every model type."),
           actionButton(ns("use_example"), "Load mtcars example",
                        class = "btn-outline-secondary btn-sm")
         )
@@ -333,6 +452,18 @@ upload_server <- function(id, shared) {
       shared$data_name <- "mtcars (example)"
       shared$var_types <- classify_variables(d)
       showNotification("Loaded mtcars example data (32 rows x 12 columns)", type = "message")
+    })
+
+    observeEvent(input$use_trial, {
+      d <- make_trial_example()
+      shared$data <- d
+      shared$data_name <- "clinical_trial_example (synthetic)"
+      shared$var_types <- classify_variables(d)
+      showNotification(
+        paste("Loaded synthetic clinical trial:", nrow(d), "patients, 2 arms.",
+              "Try: Table 1 stratified by arm; logistic on bp_controlled;",
+              "Poisson on admissions; Cox on cv_event with followup_months."),
+        type = "message", duration = 12)
     })
 
     output$has_data <- reactive(!is.null(shared$data))
@@ -922,6 +1053,8 @@ model_ui <- function(id) {
           selectInput(ns("model_type"), "Model type:", choices = c(
             "Linear regression" = "lm",
             "Logistic regression" = "glm",
+            "Poisson regression (counts)" = "poisson",
+            "Negative binomial (overdispersed counts)" = "negbin",
             "Cox regression" = "cox",
             "Mixed model (Experimental)" = "lmer"
           )),
@@ -943,7 +1076,7 @@ model_ui <- function(id) {
           hr(),
           # Cluster-robust SEs are only implemented for lm/glm — hide otherwise
           conditionalPanel(
-            condition = paste0("input['", ns("model_type"), "'] == 'lm' || ",
+            condition = paste0("input['", ns("model_type"), "'] == 'lm' || input['", ns("model_type"), "'] == 'poisson' || ",
                                "input['", ns("model_type"), "'] == 'glm'"),
             checkboxInput(ns("robust_se"), "Cluster-robust SEs (sandwich)", value = FALSE),
             conditionalPanel(
@@ -1070,6 +1203,28 @@ model_server <- function(id, shared) {
                      "' is modelled as the event (coded 1)."),
               type = "message", duration = 8)
             glm(as.formula(formula_str), data = df, family = binomial)
+          },
+          "poisson" = {
+            counts <- to_count(df[[outcome]])
+            if (is.null(counts)) {
+              stop(paste0("Poisson regression needs a count outcome (non-negative ",
+                          "whole numbers), but '", outcome, "' is not one. ",
+                          "Choose a count variable, or use linear regression."))
+            }
+            df[[outcome]] <- counts
+            glm(as.formula(formula_str), data = df, family = poisson)
+          },
+          "negbin" = {
+            counts <- to_count(df[[outcome]])
+            if (is.null(counts)) {
+              stop(paste0("Negative binomial regression needs a count outcome ",
+                          "(non-negative whole numbers), but '", outcome, "' is not one. ",
+                          "Choose a count variable, or use linear regression."))
+            }
+            df[[outcome]] <- counts
+            if (!requireNamespace("MASS", quietly = TRUE)) stop("MASS not available")
+            shared$pkgs_used <- union(shared$pkgs_used, "MASS")
+            MASS::glm.nb(as.formula(formula_str), data = df)
           },
           "cox" = {
             req(input$time_var)
@@ -1223,7 +1378,7 @@ model_server <- function(id, shared) {
 
         # Apply robust SEs if requested
         robust_applied <- FALSE
-        if (isTRUE(input$robust_se) && input$model_type %in% c("lm", "glm") &&
+        if (isTRUE(input$robust_se) && input$model_type %in% c("lm", "glm", "poisson") &&
             !is.null(input$cluster_var) && nchar(input$cluster_var) > 0) {
           if (requireNamespace("sandwich", quietly = TRUE) &&
               requireNamespace("lmtest", quietly = TRUE)) {
@@ -1258,7 +1413,7 @@ model_server <- function(id, shared) {
         }
 
         # Exponentiate for logistic/Cox/binary mixed model
-        is_exp <- input$model_type %in% c("glm", "cox") ||
+        is_exp <- is_exp_model(input$model_type) ||
                   (input$model_type == "lmer" && mixed_model_binary())
         if (is_exp) {
           tidy_df$OR_HR <- round(exp(tidy_df$estimate), 3)
@@ -1358,7 +1513,7 @@ model_server <- function(id, shared) {
 
       # For exponentiated models (glm/cox/binary lmer), use ci_lower/ci_upper (OR/HR scale)
       # and DROP the raw log-odds conf.low/conf.high to avoid duplicate CI columns
-      is_exp <- input$model_type %in% c("glm", "cox") ||
+      is_exp <- is_exp_model(input$model_type) ||
                 (input$model_type == "lmer" && mixed_model_binary())
       if (is_exp && "ci_lower" %in% names(display_df)) {
         display_df$conf.low <- NULL
@@ -1374,7 +1529,7 @@ model_server <- function(id, shared) {
         names(display_df)[names(display_df) == "conf.high"] <- "CI Upper"
       }
       if ("OR_HR" %in% names(display_df)) {
-        or_label <- if (input$model_type == "cox") "HR" else "OR"
+        or_label <- exp_label(input$model_type)
         names(display_df)[names(display_df) == "OR_HR"] <- or_label
       }
       names(display_df)[names(display_df) == "term"] <- "Term"
@@ -1385,7 +1540,7 @@ model_server <- function(id, shared) {
 
       # Reorder columns: Term, Estimate immediately before CI, P-value after CI
       if (is_exp) {
-        or_label <- if (input$model_type == "cox") "HR" else "OR"
+        or_label <- exp_label(input$model_type)
         desired_order <- c("Term", "Estimate", or_label,
                            "CI Lower", "CI Upper", "P-value", "Std. Error", "Statistic")
       } else {
@@ -1399,14 +1554,26 @@ model_server <- function(id, shared) {
       display_df <- display_df[, c(desired_order, remaining), drop = FALSE]
 
       # Build Table 2 title naming the estimate
-      estimate_desc <- switch(input$model_type,
-        "lm" = "Linear regression coefficients",
-        "glm" = "Odds ratios from logistic regression",
-        "cox" = "Hazard ratios from Cox proportional hazards regression",
-        "lmer" = if (mixed_model_binary()) "Odds ratios from mixed-effects logistic regression"
-                 else "Mixed-effects linear regression coefficients"
-      )
+      estimate_desc <- estimate_description(input$model_type, mixed_model_binary())
       table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_analytical, ")")
+
+      # Discrimination (AUC) banner for logistic models
+      auc_banner <- NULL
+      if (input$model_type == "glm") {
+        mod_auc <- model_fit()
+        a <- tryCatch(calc_auc(fitted(mod_auc), mod_auc$y), error = function(e) NULL)
+        if (!is.null(a)) {
+          shared$model_auc <- a
+          auc_banner <- div(class = "alert alert-info", style = "font-size: 13px;",
+            tags$strong("Discrimination - AUC: "),
+            paste0(round(a$auc, 3), " (95% CI ", round(a$lo, 3), " to ", round(a$hi, 3), ")"),
+            tags$span(class = "text-muted small",
+              paste0("  [", a$n_events, " events / ", a$n_nonevents, " non-events; ",
+                     "0.5 = no discrimination, 1.0 = perfect. See Plots tab for the ROC curve.]")))
+        }
+      } else {
+        shared$model_auc <- NULL
+      }
 
       # AIC / BIC model fit statistics
       fit_stats_banner <- NULL
@@ -1432,7 +1599,7 @@ model_server <- function(id, shared) {
       # Store for reuse in Step 5
       shared$model_result_html <- rendered_html
       table_html <- HTML(rendered_html)
-      tagList(missing_banner, icc_banner, table_html, fit_stats_banner)
+      tagList(missing_banner, icc_banner, auc_banner, table_html, fit_stats_banner)
     })
 
     # Copy regression results to clipboard
@@ -1451,7 +1618,7 @@ model_server <- function(id, shared) {
       diag_parts <- list()
 
       # VIF
-      if (input$show_vif && input$model_type %in% c("lm", "glm")) {
+      if (input$show_vif && input$model_type %in% c("lm", "glm", "poisson", "negbin")) {
         if (requireNamespace("car", quietly = TRUE)) {
           shared$pkgs_used <- union(shared$pkgs_used, "car")
           vif_html <- tryCatch({
@@ -1474,8 +1641,8 @@ model_server <- function(id, shared) {
         }
       }
 
-      # Estimated marginal means (lm/glm only)
-      if (input$model_type %in% c("lm", "glm")) {
+      # Estimated marginal means (lm/glm/count models)
+      if (input$model_type %in% c("lm", "glm", "poisson", "negbin")) {
         if (requireNamespace("emmeans", quietly = TRUE)) {
           shared$pkgs_used <- union(shared$pkgs_used, "emmeans")
           emm_html <- tryCatch({
@@ -1555,7 +1722,7 @@ model_server <- function(id, shared) {
         plot_df$est <- plot_df$OR_HR
         plot_df$lo <- plot_df$ci_lower
         plot_df$hi <- plot_df$ci_upper
-        x_label <- if (input$model_type %in% c("glm", "lmer")) "Odds Ratio" else "Hazard Ratio"
+        x_label <- sub("s$", "", exp_label_full(input$model_type))
         ref_line <- 1
       } else {
         plot_df$est <- plot_df$estimate
@@ -1602,8 +1769,8 @@ model_server <- function(id, shared) {
 
       # Build description
       mtype <- input$model_type
-      if (mtype %in% c("glm", "cox")) {
-        label <- if (mtype == "glm") "Odds Ratios" else "Hazard Ratios"
+      if (is_exp_model(mtype)) {
+        label <- exp_label_full(mtype)
         desc_items <- sapply(seq_len(nrow(plot_df)), function(i) {
           r <- plot_df[i, ]
           paste0(r$term, ": ", round(r$OR_HR, 2),
@@ -1683,8 +1850,9 @@ model_server <- function(id, shared) {
           selectInput(ns("km_strata"), "Stratify survival curve by:",
             choices = km_choices, selected = km_choices[1])
         )
-      } else if (mtype == "glm" || (mtype == "lmer" && mixed_model_binary())) {
-        or_label <- if (mtype == "glm") "Odds Ratios" else "Odds Ratios (mixed-effects)"
+      } else if (mtype %in% c("glm", "poisson", "negbin") ||
+                 (mtype == "lmer" && mixed_model_binary())) {
+        or_label <- if (mtype == "lmer") "Odds Ratios (mixed-effects)" else exp_label_full(mtype)
         tagList(
           p(tags$em(paste0("Showing: ", or_label))),
           forest_section
@@ -1733,7 +1901,7 @@ model_server <- function(id, shared) {
       # Use user-selected terms if available, otherwise all non-intercept terms
       all_terms <- tidy_df$term[tidy_df$term != "(Intercept)"]
 
-      is_exp <- mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())
+      is_exp <- is_exp_model(mtype, mixed_model_binary())
       if (is_exp) {
         # Forest plot with OR/HR (exponentiated)
         sel <- if (!is.null(input$plot_terms) && length(input$plot_terms) > 0) {
@@ -1746,7 +1914,7 @@ model_server <- function(id, shared) {
           plot_df$est <- as.numeric(plot_df$OR_HR)
           plot_df$lo <- as.numeric(plot_df$ci_lower)
           plot_df$hi <- as.numeric(plot_df$ci_upper)
-          est_label <- if (mtype == "cox") "Hazard Ratios" else "Odds Ratios"
+          est_label <- exp_label_full(mtype)
           x_label <- paste0(est_label, " (95% CI)")
           plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
           plot_df$label <- paste0(round(plot_df$est, 2), " [",
@@ -1796,6 +1964,29 @@ model_server <- function(id, shared) {
               plot.title = ggplot2::element_text(face = "bold"))
           plot_list <- c(plot_list, list(forest_p))
         }
+      }
+
+      # --- ROC curve (logistic only — always shown) ---
+      if (mtype == "glm") {
+        roc_p <- tryCatch({
+          a <- calc_auc(fitted(mod), mod$y)
+          rp <- roc_points(fitted(mod), mod$y)
+          if (is.null(a)) NULL else {
+            ggplot2::ggplot(rp, ggplot2::aes(x = fpr, y = tpr)) +
+              ggplot2::geom_abline(intercept = 0, slope = 1,
+                                   linetype = "dashed", color = "grey60") +
+              ggplot2::geom_line(color = "#4e79a7", linewidth = 1) +
+              ggplot2::coord_equal() +
+              ggplot2::labs(
+                title = paste0("ROC Curve - AUC = ", round(a$auc, 3),
+                               " (95% CI ", round(a$lo, 3), "-", round(a$hi, 3), ")"),
+                x = "False positive rate (1 - specificity)",
+                y = "True positive rate (sensitivity)") +
+              ggplot2::theme_minimal(base_size = 13) +
+              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+          }
+        }, error = function(e) NULL)
+        if (!is.null(roc_p)) plot_list <- c(plot_list, list(roc_p))
       }
 
       # --- KM survival curve (Cox only — always shown) ---
@@ -1930,7 +2121,7 @@ model_server <- function(id, shared) {
       plot_descriptions <- list()
 
       # Forest plot description (all model types)
-      is_exp <- mtype %in% c("glm", "cox") || (mtype == "lmer" && mixed_model_binary())
+      is_exp <- is_exp_model(mtype, mixed_model_binary())
       sel <- input$plot_terms
       tidy_df <- model_tidy()
       # Fallback: use all non-intercept terms if checkboxes not yet available
@@ -1941,7 +2132,7 @@ model_server <- function(id, shared) {
         sub_df <- tidy_df[tidy_df$term %in% sel, , drop = FALSE]
         if (nrow(sub_df) > 0) {
           if (is_exp) {
-            label <- if (mtype == "cox") "Hazard Ratios" else "Odds Ratios"
+            label <- exp_label_full(mtype)
             desc_items <- sapply(seq_len(nrow(sub_df)), function(i) {
               r <- sub_df[i, ]
               paste0(r$term, ": ", round(as.numeric(r$OR_HR), 2),
@@ -2001,6 +2192,20 @@ model_server <- function(id, shared) {
             )))
           }
         }
+      }
+
+      # ROC curve description (logistic)
+      if (mtype == "glm" && !is.null(shared$model_auc)) {
+        a <- shared$model_auc
+        plot_descriptions <- c(plot_descriptions, list(list(
+          type = "roc_curve",
+          title = paste0("ROC Curve (AUC = ", round(a$auc, 3), ")"),
+          description = paste0(
+            "Receiver operating characteristic curve for the logistic model. ",
+            "AUC = ", round(a$auc, 3), " (95% CI ", round(a$lo, 3), " to ",
+            round(a$hi, 3), "); ", a$n_events, " events, ",
+            a$n_nonevents, " non-events.")
+        )))
       }
 
       shared$plots <- plot_descriptions
@@ -2256,6 +2461,8 @@ results_server <- function(id, shared) {
         model_label <- switch(res$type,
           "lm" = "Linear regression (OLS)",
           "glm" = "Logistic regression (binomial, logit link)",
+          "poisson" = "Poisson regression (log link)",
+          "negbin" = "Negative binomial regression (log link)",
           "cox" = "Cox proportional hazards regression",
           "lmer" = "Linear mixed-effects model (REML)",
           res$type)
@@ -2275,7 +2482,7 @@ results_server <- function(id, shared) {
 
         # Add OR/HR if logistic or Cox
         or_hr_text <- ""
-        if (res$type %in% c("glm", "cox") && "OR_HR" %in% names(tidy_df)) {
+        if (is_exp_model(res$type) && "OR_HR" %in% names(tidy_df)) {
           or_hr_text <- paste(capture.output(print(
             data.frame(
               Term = tidy_df$term,
@@ -2632,6 +2839,7 @@ results_server <- function(id, shared) {
         # stats provides lm(), glm(), AIC(), BIC() — always used when a model is fitted
         used_pkgs <- c(used_pkgs, "stats")
         if (mt == "cox") used_pkgs <- c(used_pkgs, "survival")
+        if (mt == "negbin") used_pkgs <- c(used_pkgs, "MASS")
         if (mt == "lmer") {
           if (isTRUE(shared$model_result$is_binary_mixed)) {
             used_pkgs <- c(used_pkgs, "lme4")
@@ -2678,6 +2886,8 @@ results_server <- function(id, shared) {
         model_desc <- switch(res$type,
           "lm" = "Multivariable linear regression was used to estimate regression coefficients with 95% confidence intervals.",
           "glm" = "Multivariable logistic regression was used to estimate odds ratios (ORs) with 95% confidence intervals.",
+          "poisson" = "Multivariable Poisson regression was used to estimate incidence rate ratios (IRRs) with 95% confidence intervals.",
+          "negbin" = "Multivariable negative binomial regression was used to estimate incidence rate ratios (IRRs) with 95% confidence intervals, allowing for overdispersion.",
           "cox" = "Cox proportional hazards regression was used to estimate hazard ratios (HRs) with 95% confidence intervals.",
           "lmer" = if (is_binary_mixed) {
             "A mixed-effects logistic regression model (generalised linear mixed model with a logit link) was fitted to estimate odds ratios (ORs) with 95% confidence intervals, accounting for clustering using random intercepts."
@@ -2765,13 +2975,7 @@ results_server <- function(id, shared) {
           res <- shared$model_result
           n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
           is_binary_mixed <- isTRUE(res$is_binary_mixed)
-          estimate_desc <- switch(res$type,
-            "lm" = "Linear regression coefficients",
-            "glm" = "Odds ratios from logistic regression",
-            "cox" = "Hazard ratios from Cox proportional hazards regression",
-            "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
-                     else "Mixed-effects linear regression coefficients",
-            res$type)
+          estimate_desc <- estimate_description(res$type, is_binary_mixed)
           table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
         }
         # AIC/BIC
@@ -2799,13 +3003,7 @@ results_server <- function(id, shared) {
                                      round(display_df$p.value, 4))
         n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
-        estimate_desc <- switch(res$type,
-          "lm" = "Linear regression coefficients",
-          "glm" = "Odds ratios from logistic regression",
-          "cox" = "Hazard ratios from Cox proportional hazards regression",
-          "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
-                   else "Mixed-effects linear regression coefficients",
-          res$type)
+        estimate_desc <- estimate_description(res$type, is_binary_mixed)
         table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
         regression_html <- df_to_html_table(display_df, title = table2_title)
       }
@@ -2969,23 +3167,17 @@ results_server <- function(id, shared) {
         tidy_df <- res$tidy
         n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
-        estimate_desc <- toupper(switch(res$type,
-          "lm" = "Linear regression coefficients",
-          "glm" = "Odds ratios from logistic regression",
-          "cox" = "Hazard ratios from Cox proportional hazards regression",
-          "lmer" = if (is_binary_mixed) "Odds ratios from mixed-effects logistic regression"
-                   else "Mixed-effects linear regression coefficients",
-          res$type))
+        estimate_desc <- toupper(estimate_description(res$type, is_binary_mixed))
 
         # Build text table matching the app column order
-        is_exp <- res$type %in% c("glm", "cox") || (res$type == "lmer" && is_binary_mixed)
+        is_exp <- is_exp_model(res$type, is_binary_mixed)
         txt_df <- data.frame(
           Term = tidy_df$term,
           Estimate = unname(round(as.numeric(tidy_df$estimate), 2)),
           stringsAsFactors = FALSE
         )
         if (is_exp && "OR_HR" %in% names(tidy_df)) {
-          or_label <- if (res$type == "cox") "HR" else "OR"
+          or_label <- exp_label(res$type)
           txt_df[[or_label]] <- unname(round(as.numeric(tidy_df$OR_HR), 2))
         }
         if ("conf.low" %in% names(tidy_df)) {

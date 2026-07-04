@@ -54,10 +54,12 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sa
 | Model | Use case |
 |-------|----------|
 | **Linear regression** | Continuous outcomes |
-| **Logistic regression** | Binary outcomes (odds ratios) |
+| **Logistic regression** | Binary outcomes (odds ratios) plus ROC curve and AUC with 95% CI |
+| **Poisson regression** | Count outcomes (incidence rate ratios) |
+| **Negative binomial** | Overdispersed count outcomes (incidence rate ratios) |
 | **Cox regression** | Time-to-event / survival data (hazard ratios) plus Schoenfeld residuals to test for proportional hazards|
 | **Mixed model** | Clustered / hierarchical data with random effects |
-**Plots** automatically generated depedent on model. Forest plots provided for all. Multiple plots chosen are faceted/ tiled.
+**Plots** automatically generated dependent on model. Forest plots provided for all. Multiple plots chosen are faceted/ tiled.
 <img width="1894" height="885" alt="image" src="https://github.com/user-attachments/assets/7a8b01b5-b398-46dc-b26b-910d0b384a8e" />
 <img width="1887" height="883" alt="image" src="https://github.com/user-attachments/assets/7a58f2b7-9cc0-4bea-8be1-bb6a7c9103e7" />
 <img width="1262" height="915" alt="image" src="https://github.com/user-attachments/assets/d682da2f-091f-4094-8981-c5a1c0acd891" />

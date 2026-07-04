@@ -38,18 +38,17 @@ jobs:
             cat("app.json is in sync with app.R\n")
           '
 
-  # Statistical ground-truth validation on desktop R. Non-blocking for now:
-  # the script still references gt/gtsummary from an older app iteration.
-  # Tighten to blocking once tests/validate_statistics.R is updated.
+  # Statistical ground-truth validation. Blocking: the script loads the real
+  # function definitions from shinylive-app/app.R and exits non-zero on any
+  # failed assertion.
   validate-statistics:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
       - name: Install packages
-        run: Rscript -e 'install.packages(c("broom","car","emmeans","gt","gtsummary","lme4","lmtest","sandwich","survival"))'
+        run: Rscript -e 'install.packages(c("broom","lmtest","sandwich","survival","jsonlite"))'
       - name: Run statistical validation
         run: Rscript tests/validate_statistics.R
