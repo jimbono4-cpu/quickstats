@@ -515,42 +515,87 @@ explore_server <- function(id, shared) {
       miss_df[order(-miss_df$Pct_Missing), ]
     }, striped = TRUE, spacing = "s")
 
-    # Variable label editor
+    # Variable label + type editor
     output$label_editor <- renderUI({
       req(shared$data)
       vars <- names(shared$data)
       vars_show <- head(vars, 15)
-      label_inputs <- lapply(vars_show, function(v) {
+      vt <- shared$var_types
+      editor_rows <- lapply(vars_show, function(v) {
         current_label <- ""
         if (requireNamespace("labelled", quietly = TRUE)) {
           l <- labelled::var_label(shared$data[[v]])
           if (!is.null(l)) current_label <- l
         }
-        textInput(ns(paste0("lbl_", v)), label = v,
-                  value = current_label, placeholder = "Enter label...")
+        detected <- if (!is.null(vt) && v %in% vt$variable) {
+          vt$type[vt$variable == v]
+        } else "categorical"
+        type_input <- if (detected %in% c("numeric", "categorical")) {
+          selectInput(ns(paste0("type_", v)), label = NULL,
+                      choices = c("Continuous" = "numeric",
+                                  "Categorical" = "categorical"),
+                      selected = detected, width = "100%")
+        } else {
+          p(class = "text-muted small", paste0("Type: ", detected))
+        }
+        tagList(
+          textInput(ns(paste0("lbl_", v)), label = v,
+                    value = current_label, placeholder = "Enter label..."),
+          type_input
+        )
       })
       tagList(
-        label_inputs,
+        p(class = "text-muted small",
+          "Type controls how each variable is treated in Table 1 and models",
+          "(continuous: mean/SD, regression slope; categorical: n (%), dummy coding)."),
+        editor_rows,
         if (length(vars) > 15) p(class = "text-muted small",
           paste("Showing first 15 of", length(vars), "variables")),
-        actionButton(ns("apply_labels"), "Apply Labels", class = "btn-primary btn-sm")
+        actionButton(ns("apply_labels"), "Apply Labels & Types", class = "btn-primary btn-sm")
       )
     })
 
     observeEvent(input$apply_labels, {
       req(shared$data)
-      if (!requireNamespace("labelled", quietly = TRUE)) return()
       df <- shared$data
+      vt <- shared$var_types
       vars <- head(names(df), 15)
+      type_msgs <- character(0)
       for (v in vars) {
+        # Labels
         lbl_val <- input[[paste0("lbl_", v)]]
-        if (!is.null(lbl_val) && nchar(trimws(lbl_val)) > 0) {
+        if (!is.null(lbl_val) && nchar(trimws(lbl_val)) > 0 &&
+            requireNamespace("labelled", quietly = TRUE)) {
           shared$pkgs_used <- union(shared$pkgs_used, "labelled")
           labelled::var_label(df[[v]]) <- trimws(lbl_val)
         }
+        # Type overrides
+        new_type <- input[[paste0("type_", v)]]
+        if (is.null(new_type) || is.null(vt) || !(v %in% vt$variable)) next
+        old_type <- vt$type[vt$variable == v]
+        if (new_type == old_type) next
+        if (new_type == "numeric") {
+          # Converting to continuous: the column must be numeric-convertible
+          converted <- suppressWarnings(as.numeric(as.character(df[[v]])))
+          n_new_na <- sum(is.na(converted)) - sum(is.na(df[[v]]))
+          if (all(is.na(converted[!is.na(df[[v]])]))) {
+            type_msgs <- c(type_msgs, paste0(
+              v, ": cannot treat as continuous (values are not numbers) - kept as categorical."))
+            next
+          }
+          if (n_new_na > 0) {
+            type_msgs <- c(type_msgs, paste0(
+              v, ": treated as continuous; ", n_new_na,
+              " non-numeric value(s) became missing."))
+          }
+          df[[v]] <- converted
+        }
+        vt$type[vt$variable == v] <- new_type
       }
       shared$data <- df
-      showNotification("Variable labels applied", type = "message")
+      shared$var_types <- vt
+      showNotification("Variable labels and types applied", type = "message")
+      for (m in type_msgs) showNotification(m, type = "warning", duration = 10)
     })
   })
 }
@@ -1423,7 +1468,7 @@ model_server <- function(id, shared) {
               "<p class='text-muted small'>VIF > 5: moderate concern. VIF > 10: serious multicollinearity.</p>",
               tbl_html)
           }, error = function(e) {
-            paste0("<p>VIF error: ", conditionMessage(e), "</p>")
+            paste0("<p>VIF error: ", htmltools::htmlEscape(conditionMessage(e)), "</p>")
           })
           diag_parts <- c(diag_parts, list(vif_html))
         }
@@ -1487,7 +1532,7 @@ model_server <- function(id, shared) {
             "A significant p-value (p < 0.05) suggests the proportional hazards assumption may be violated.</p>",
             tbl_html)
         }, error = function(e) {
-          paste0("<p>Cox diagnostics error: ", conditionMessage(e), "</p>")
+          paste0("<p>Cox diagnostics error: ", htmltools::htmlEscape(conditionMessage(e)), "</p>")
         })
         diag_parts <- c(diag_parts, list(cox_html))
       }
@@ -2801,7 +2846,7 @@ results_server <- function(id, shared) {
         '<h1>Statistical Analysis Report</h1>',
         '<p class="meta"><strong>Generated:</strong> ', format(Sys.time(), "%Y-%m-%d %H:%M"), '</p>',
         '<p class="meta"><strong>Data:</strong> ',
-          if (!is.null(shared$data_name)) shared$data_name else "Unknown", '</p>',
+          if (!is.null(shared$data_name)) htmltools::htmlEscape(shared$data_name) else "Unknown", '</p>',
         '<p class="meta"><strong>R Version:</strong> ', R.version.string, '</p>',
         '<div class="privacy">All analysis performed in-browser via WebR. ',
         'No data was uploaded to any server.</div>')
@@ -3077,6 +3122,10 @@ ui <- fluidPage(
         display: flex; align-items: center; justify-content: center;
         font-size: 14px; font-weight: bold; cursor: pointer;
         border: 2px solid #dee2e6; background: white; color: #6c757d;
+        padding: 0; font-family: inherit;
+      }
+      .step-dot:focus-visible {
+        outline: 3px solid #4e79a7; outline-offset: 2px;
       }
       .step-dot.active {
         background: #667eea; color: white; border-color: #667eea;
@@ -3403,20 +3452,25 @@ server <- function(input, output, session) {
   step_names <- c("Upload", "Explore", "Table 1", "Model", "Results")
   step_ids <- paste0("step", 1:total_steps)
 
-  # Step indicator
+  # Step indicator — real buttons so the wizard is keyboard-navigable
   output$step_indicators <- renderUI({
     step <- current_step()
     dots <- lapply(1:total_steps, function(i) {
       cls <- "step-dot"
       if (i == step) cls <- paste(cls, "active")
       else if (i < step) cls <- paste(cls, "completed")
-      tag <- tags$div(class = cls, i,
-                      title = paste("Step", i, "-", step_names[i]),
-                      onclick = sprintf("Shiny.setInputValue('goto_step', %d, {priority: 'event'})", i))
+      tag <- tags$button(class = cls, i,
+                         type = "button",
+                         title = paste("Step", i, "-", step_names[i]),
+                         `aria-label` = paste0("Go to step ", i, ": ", step_names[i]),
+                         `aria-current` = if (i == step) "step" else NULL,
+                         onclick = sprintf("Shiny.setInputValue('goto_step', %d, {priority: 'event'})", i))
       tagList(tag,
-        if (i < total_steps) tags$div(style = "width:30px; height:2px; background:#dee2e6;"))
+        if (i < total_steps) tags$div(style = "width:30px; height:2px; background:#dee2e6;",
+                                      `aria-hidden` = "true"))
     })
-    div(class = "step-indicator", style = "justify-content: center; margin: 10px 0;", dots)
+    tags$nav(class = "step-indicator", style = "justify-content: center; margin: 10px 0; display: flex; gap: 8px; align-items: center;",
+             `aria-label` = "Analysis steps", dots)
   })
 
   output$step_label <- renderUI({

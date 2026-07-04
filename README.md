@@ -33,7 +33,7 @@ Import your dataset in **CSV, Excel (.xlsx), Stata (.dta), SPSS (.sav), SAS (.sa
 ### Step 2 — Explore Data
 - View variable distributions with histograms and bar charts
 - Inspect missing data patterns
-- Apply variable labels that carry through to Table 1 and regression output (variable types are detected automatically)
+- Review detected variable types, override them (continuous vs categorical), and apply labels that carry through to Table 1 and regression output
 - Normality testing (Shapiro-Wilk)
 
 <img width="1554" height="887" alt="image" src="https://github.com/user-attachments/assets/b2d12b02-14b3-4893-a1ac-6b603cb04291" />

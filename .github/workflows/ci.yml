@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Fast, blocking: app.R must parse, and docs/app.json (the deployed bundle)
+  # must contain exactly the same app.R — catching the classic failure mode of
+  # editing the source and forgetting to re-export.
+  check-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install jsonlite
+        run: Rscript -e 'install.packages("jsonlite")'
+      - name: Parse app.R and verify app.json is in sync
+        run: |
+          Rscript -e '
+            parsed <- parse("shinylive-app/app.R")
+            cat("parse OK:", length(parsed), "top-level expressions\n")
+            src <- readChar("shinylive-app/app.R",
+                            file.info("shinylive-app/app.R")$size, useBytes = TRUE)
+            src <- gsub("\r\n", "\n", src, fixed = TRUE)
+            emb <- NULL
+            for (e in jsonlite::fromJSON("docs/app.json", simplifyDataFrame = FALSE)) {
+              if (e$name == "app.R") emb <- e$content
+            }
+            if (is.null(emb)) stop("no app.R entry in docs/app.json")
+            if (!identical(trimws(emb), trimws(src))) {
+              stop("docs/app.json is OUT OF SYNC with shinylive-app/app.R - re-export before pushing")
+            }
+            cat("app.json is in sync with app.R\n")
+          '
+
+  # Statistical ground-truth validation on desktop R. Non-blocking for now:
+  # the script still references gt/gtsummary from an older app iteration.
+  # Tighten to blocking once tests/validate_statistics.R is updated.
+  validate-statistics:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install packages
+        run: Rscript -e 'install.packages(c("broom","car","emmeans","gt","gtsummary","lme4","lmtest","sandwich","survival"))'
+      - name: Run statistical validation
+        run: Rscript tests/validate_statistics.R

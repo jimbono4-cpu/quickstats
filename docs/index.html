@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- CSP: makes the privacy promise enforceable — scripts only from this
+         site + GoatCounter; network connections only to this site, the WebR
+         package repo, and GoatCounter. Uploaded data cannot be sent anywhere
+         else even if malicious content were injected. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://gc.zgo.at blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://jimbono4.goatcounter.com; font-src 'self' data:; connect-src 'self' https://repo.r-wasm.org http://repo.r-wasm.org https://jimbono4.goatcounter.com; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Run R in the Browser – QuickStats Statistical Analysis Tool</title>
     <meta name="description" content="Run statistical analyses directly in the browser using R (WebR). Upload datasets and generate publication-ready statistical tables and plots with no R installation required.">
@@ -338,6 +343,6 @@
       <a href="https://github.com/jimbono4-cpu/quickstats" target="_blank" rel="noopener">&#11088; Star on GitHub</a>
     </div>
     <script data-goatcounter="https://jimbono4.goatcounter.com/count"
-            async src="//gc.zgo.at/count.js"></script>
+            async src="https://gc.zgo.at/count.js"></script>
   </body>
 </html>
