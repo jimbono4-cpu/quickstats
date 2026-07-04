@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://gc.zgo.at; style-src 'unsafe-inline'; img-src 'self' data: https://jimbono4.goatcounter.com; connect-src https://jimbono4.goatcounter.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cox Regression Online — Free Survival Analysis with Hazard Ratios | QuickStats</title>
+  <meta name="description" content="Run Cox proportional hazards regression free in your browser: hazard ratios with 95% CIs, Kaplan-Meier curves, Schoenfeld residual tests, concordance. Upload CSV/Excel/SPSS/Stata — no installation, fully private.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://quickstats.tools/cox-regression-calculator/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://quickstats.tools/cox-regression-calculator/">
+  <meta property="og:title" content="Cox Regression Online — Free Survival Analysis with Hazard Ratios">
+  <meta property="og:description" content="Cox proportional hazards, Kaplan-Meier curves, and proportional hazards testing — free in your browser, no installation, fully private.">
+  <meta property="og:image" content="https://quickstats.tools/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://quickstats.tools/og-image.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "What do I need in my dataset for survival analysis?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Two things: a numeric follow-up time variable (days, months, or years) and an event indicator with two levels (e.g. died yes/no, 0/1). QuickStats codes the event variable automatically and tells you which level counts as the event."}},
+      {"@type": "Question", "name": "Does it check the proportional hazards assumption?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes. The diagnostics tab runs Schoenfeld residual tests (cox.zph) for every predictor and globally, and reports the model's concordance (C-statistic)."}},
+      {"@type": "Question", "name": "Can it draw Kaplan-Meier survival curves?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes — a Kaplan-Meier curve stratified by any predictor you choose, with confidence bands, is drawn automatically alongside the hazard ratio forest plot."}},
+      {"@type": "Question", "name": "Is my data uploaded to a server?",
+       "acceptedAnswer": {"@type": "Answer", "text": "No. The survival models are fitted by R's survival package compiled to WebAssembly, running entirely inside your browser tab."}}
+    ]
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: #2d3748; line-height: 1.65; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 14px 24px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 30px; color: #1a202c; line-height: 1.25; margin-bottom: 14px; }
+    h2 { font-size: 21px; color: #2d3748; margin: 30px 0 10px; }
+    p, li { font-size: 16px; margin-bottom: 10px; }
+    ul, ol { padding-left: 24px; margin-bottom: 12px; }
+    .cta { display: inline-block; background: #667eea; color: #fff; padding: 13px 30px;
+           border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 17px; margin: 14px 0; }
+    .cta:hover { background: #5a67d8; }
+    .badges { color: #4a5568; font-size: 14px; margin-bottom: 8px; }
+    .note { background: #ebf4ff; border-left: 4px solid #667eea; padding: 10px 14px; border-radius: 4px; margin: 14px 0; font-size: 15px; }
+    footer { border-top: 1px solid #e2e8f0; margin-top: 40px; padding: 22px 24px; font-size: 14px; color: #4a5568; }
+    footer nav a { color: #5a67d8; text-decoration: none; margin-right: 14px; }
+    dt { font-weight: 600; margin-top: 14px; }
+    dd { margin-left: 0; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header><a href="/">QuickStats</a></header>
+  <main>
+    <h1>Cox Regression &amp; Survival Analysis Online</h1>
+    <p class="badges">✓ Free &nbsp; ✓ Kaplan-Meier curves &nbsp; ✓ Schoenfeld residuals &nbsp; ✓ Fully private</p>
+    <p>Fit a <strong>Cox proportional hazards model</strong> on your own time-to-event data, directly in your browser. QuickStats reports <strong>hazard ratios with 95% confidence intervals</strong>, draws Kaplan-Meier survival curves, tests the proportional hazards assumption with Schoenfeld residuals, and reports model concordance — using R's gold-standard <em>survival</em> package compiled to WebAssembly.</p>
+    <a class="cta" href="/">Open the survival analysis tool →</a>
+
+    <h2>How it works</h2>
+    <ol>
+      <li><strong>Upload</strong> your dataset (CSV, Excel, Stata, SPSS, SAS) — it needs a follow-up time variable and a two-level event indicator.</li>
+      <li><strong>Select</strong> the event variable as the outcome, Cox regression as the model, and the time variable — any coding works (0/1, died/alive, yes/no).</li>
+      <li><strong>Tick predictors</strong> and fit. Hazard ratios, CIs, and p-values appear in a journal-ready table.</li>
+      <li><strong>Review plots and diagnostics</strong>: forest plot, Kaplan-Meier curve stratified by any predictor, Schoenfeld residual tests, concordance.</li>
+    </ol>
+
+    <h2>What you get</h2>
+    <ul>
+      <li>Hazard ratios (95% CI) with p-values for every predictor</li>
+      <li><strong>Kaplan-Meier survival curves</strong> with confidence bands, stratified by the variable of your choice</li>
+      <li><strong>Proportional hazards testing</strong> — per-variable and global Schoenfeld residual tests, flagged when the assumption may be violated</li>
+      <li>Concordance (C-statistic) for model discrimination</li>
+      <li>Transparent complete-case reporting and an auto-drafted methods paragraph</li>
+      <li>Copy-to-Word tables and downloadable PDF/Word reports with embedded figures</li>
+    </ul>
+
+    <div class="note"><strong>Tip:</strong> the built-in clinical trial example dataset includes survival outcomes (<em>followup_months</em>, <em>cv_event</em>), so you can try the full survival workflow before uploading your own data.</div>
+
+    <h2>Frequently asked questions</h2>
+    <dl>
+      <dt>What does my dataset need?</dt>
+      <dd>A numeric follow-up time and a two-level event indicator. QuickStats codes the event automatically and names the level it treats as the event.</dd>
+      <dt>Does it check proportional hazards?</dt>
+      <dd>Yes — Schoenfeld residual tests for each predictor and globally, in the Diagnostics tab.</dd>
+      <dt>Can it draw Kaplan-Meier curves?</dt>
+      <dd>Yes, stratified by any predictor, with confidence bands.</dd>
+      <dt>Is my data uploaded?</dt>
+      <dd>No — everything runs in your browser. <a href="/privacy/">How the privacy guarantee works</a>.</dd>
+    </dl>
+
+    <h2>More free tools</h2>
+    <p><a href="/table-1-generator/">Table 1 generator</a> · <a href="/logistic-regression-calculator/">Logistic regression calculator</a> · <a href="/free-spss-alternative/">Free SPSS alternative</a></p>
+  </main>
+  <footer>
+    <nav>
+      <a href="/">QuickStats app</a>
+      <a href="/table-1-generator/">Table 1 generator</a>
+      <a href="/logistic-regression-calculator/">Logistic regression</a>
+      <a href="/cox-regression-calculator/">Cox regression</a>
+      <a href="/free-spss-alternative/">SPSS alternative</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+  <script data-goatcounter="https://jimbono4.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://gc.zgo.at; style-src 'unsafe-inline'; img-src 'self' data: https://jimbono4.goatcounter.com; connect-src https://jimbono4.goatcounter.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Logistic Regression Calculator — Odds Ratios, ROC Curve &amp; AUC | QuickStats</title>
+  <meta name="description" content="Run multivariable logistic regression free in your browser: odds ratios with 95% CIs, forest plot, ROC curve and AUC, VIF diagnostics. Upload CSV/Excel/SPSS/Stata — no installation, your data never leaves your device.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://quickstats.tools/logistic-regression-calculator/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://quickstats.tools/logistic-regression-calculator/">
+  <meta property="og:title" content="Free Logistic Regression Calculator — Odds Ratios, ROC &amp; AUC">
+  <meta property="og:description" content="Multivariable logistic regression in your browser: odds ratios, forest plots, ROC curve with AUC. Free, private, no installation.">
+  <meta property="og:image" content="https://quickstats.tools/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://quickstats.tools/og-image.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "Can it run multivariable logistic regression, not just single predictors?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes. Select any number of predictors — continuous and categorical are handled automatically, with categorical predictors dummy-coded against a reference level. Results report odds ratios with 95% confidence intervals and p-values for every term."}},
+      {"@type": "Question", "name": "Does it produce a ROC curve and AUC?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every logistic model automatically reports the area under the ROC curve (AUC) with a 95% confidence interval, and draws the ROC curve alongside a forest plot of the odds ratios."}},
+      {"@type": "Question", "name": "How does it handle outcomes coded as Yes/No or Case/Control?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Any two-level outcome works — 0/1, 1/2, Yes/No, Case/Control, TRUE/FALSE. QuickStats codes it automatically and tells you which level is being modelled as the event."}},
+      {"@type": "Question", "name": "Is this really free and private?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Completely free, no sign-up. The R statistical engine runs inside your browser via WebAssembly, so your data is never uploaded to any server."}}
+    ]
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: #2d3748; line-height: 1.65; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 14px 24px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 30px; color: #1a202c; line-height: 1.25; margin-bottom: 14px; }
+    h2 { font-size: 21px; color: #2d3748; margin: 30px 0 10px; }
+    p, li { font-size: 16px; margin-bottom: 10px; }
+    ul, ol { padding-left: 24px; margin-bottom: 12px; }
+    .cta { display: inline-block; background: #667eea; color: #fff; padding: 13px 30px;
+           border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 17px; margin: 14px 0; }
+    .cta:hover { background: #5a67d8; }
+    .badges { color: #4a5568; font-size: 14px; margin-bottom: 8px; }
+    .note { background: #ebf4ff; border-left: 4px solid #667eea; padding: 10px 14px; border-radius: 4px; margin: 14px 0; font-size: 15px; }
+    footer { border-top: 1px solid #e2e8f0; margin-top: 40px; padding: 22px 24px; font-size: 14px; color: #4a5568; }
+    footer nav a { color: #5a67d8; text-decoration: none; margin-right: 14px; }
+    dt { font-weight: 600; margin-top: 14px; }
+    dd { margin-left: 0; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header><a href="/">QuickStats</a></header>
+  <main>
+    <h1>Free Logistic Regression Calculator</h1>
+    <p class="badges">✓ Free &nbsp; ✓ No sign-up &nbsp; ✓ Multivariable &nbsp; ✓ ROC curve &amp; AUC included</p>
+    <p>Fit a <strong>multivariable logistic regression</strong> on your own data, in your browser, in about a minute. QuickStats reports <strong>odds ratios with 95% confidence intervals</strong>, draws a forest plot and a <strong>ROC curve with AUC</strong>, and produces a journal-ready results table you can paste into Word — powered by real R, not a simplified approximation.</p>
+    <a class="cta" href="/">Open the logistic regression calculator →</a>
+
+    <h2>How it works</h2>
+    <ol>
+      <li><strong>Upload</strong> a CSV, Excel, Stata, SPSS, or SAS file (or try the built-in clinical trial example).</li>
+      <li><strong>Choose the outcome</strong> — any two-level variable works: 0/1, Yes/No, Case/Control. QuickStats tells you which level it models as the event.</li>
+      <li><strong>Tick your predictors</strong> — categorical variables are dummy-coded automatically; you can override how variables are treated.</li>
+      <li><strong>Fit the model</strong> and read odds ratios, CIs, p-values, AUC, and diagnostics. Copy the table or download a full report.</li>
+    </ol>
+
+    <h2>What you get</h2>
+    <ul>
+      <li>Odds ratios (95% CI) and p-values for all predictors, publication-formatted</li>
+      <li><strong>ROC curve and AUC with 95% confidence interval</strong> (Hanley-McNeil) — the discrimination statistic reviewers ask for</li>
+      <li>Forest plot of odds ratios, downloadable as PNG or copyable to your clipboard</li>
+      <li>Optional <strong>cluster-robust standard errors</strong> (sandwich estimator) for clustered designs</li>
+      <li>VIF multicollinearity diagnostics and estimated marginal means</li>
+      <li>Transparent complete-case reporting: how many observations were excluded for missing data</li>
+      <li>An auto-drafted statistical methods paragraph for your manuscript</li>
+    </ul>
+
+    <div class="note"><strong>Also need counts or survival?</strong> QuickStats fits Poisson and negative binomial models (incidence rate ratios) and <a href="/cox-regression-calculator/">Cox proportional hazards models</a> in the same five-step workflow.</div>
+
+    <h2>Frequently asked questions</h2>
+    <dl>
+      <dt>Can it run multivariable models?</dt>
+      <dd>Yes — any number of predictors, continuous or categorical, with automatic dummy coding.</dd>
+      <dt>Does it produce a ROC curve and AUC?</dt>
+      <dd>Yes, automatically for every logistic model, with a 95% confidence interval for the AUC.</dd>
+      <dt>How are Yes/No outcomes handled?</dt>
+      <dd>Coded automatically, with a notification telling you which level is treated as the event (coded 1).</dd>
+      <dt>Is my data uploaded?</dt>
+      <dd>No — the R engine runs in your browser via WebAssembly. <a href="/privacy/">Read how the privacy guarantee works</a>.</dd>
+    </dl>
+
+    <h2>More free tools</h2>
+    <p><a href="/table-1-generator/">Table 1 generator</a> · <a href="/cox-regression-calculator/">Cox regression &amp; survival analysis</a> · <a href="/free-spss-alternative/">Free SPSS alternative</a></p>
+  </main>
+  <footer>
+    <nav>
+      <a href="/">QuickStats app</a>
+      <a href="/table-1-generator/">Table 1 generator</a>
+      <a href="/logistic-regression-calculator/">Logistic regression</a>
+      <a href="/cox-regression-calculator/">Cox regression</a>
+      <a href="/free-spss-alternative/">SPSS alternative</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+  <script data-goatcounter="https://jimbono4.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

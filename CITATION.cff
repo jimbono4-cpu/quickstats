@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use QuickStats in your research, please cite it as below."
+title: "QuickStats: browser-based statistical analysis with WebR"
+type: software
+authors:
+  - family-names: White
+    given-names: James
+repository-code: "https://github.com/jimbono4-cpu/quickstats"
+url: "https://quickstats.tools/"
+license: MIT
+keywords:
+  - statistics
+  - WebAssembly
+  - WebR
+  - R
+  - epidemiology
+  - "Table 1"
+  - regression
+abstract: >-
+  QuickStats is a free, open-source statistical analysis tool that runs the R
+  statistical language entirely in the web browser via WebAssembly (WebR).
+  It generates publication-ready descriptive statistics (Table 1) and fits
+  linear, logistic, Poisson, negative binomial, Cox, and mixed-effects
+  regression models with journal-formatted output. No installation or account
+  is required, and uploaded data never leaves the user's device.

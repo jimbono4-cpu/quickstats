@@ -9,7 +9,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://gc.zgo.at blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://jimbono4.goatcounter.com; font-src 'self' data:; connect-src 'self' https://repo.r-wasm.org http://repo.r-wasm.org https://jimbono4.goatcounter.com; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Run R in the Browser – QuickStats Statistical Analysis Tool</title>
-    <meta name="description" content="Run statistical analyses directly in the browser using R (WebR). Upload datasets and generate publication-ready statistical tables and plots with no R installation required.">
+    <meta name="description" content="Free statistical analysis in your browser: publication-ready Table 1 generator, linear, logistic (with ROC/AUC), Poisson, Cox and mixed models. Powered by R via WebAssembly — no installation, no sign-up, your data never leaves your device.">
     <meta name="keywords" content="run R in browser, WebR, statistical analysis tool, statistics online, data analysis tool, R statistics online, regression, logistic regression, Cox regression, mixed models, descriptive statistics, Table 1, forest plot, free statistics tool, online statistics calculator">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://quickstats.tools/">
@@ -204,6 +204,15 @@
 
       <p>If you need a statistical analysis tool without installing R, QuickStats provides a simple way to run R directly in the browser using WebR.</p>
 
+      <h2>Guides to specific analyses</h2>
+      <ul>
+        <li><a href="/table-1-generator/">Free Table 1 generator</a> — publication-ready baseline characteristics with automatic test selection</li>
+        <li><a href="/logistic-regression-calculator/">Logistic regression calculator</a> — odds ratios, forest plot, ROC curve and AUC</li>
+        <li><a href="/cox-regression-calculator/">Cox regression and survival analysis</a> — hazard ratios, Kaplan-Meier curves, Schoenfeld tests</li>
+        <li><a href="/free-spss-alternative/">Free SPSS alternative</a> — opens .sav files directly in the browser</li>
+        <li><a href="/privacy/">Privacy</a> — how "your data never leaves your browser" is technically enforced</li>
+      </ul>
+
       <noscript>
         <p><strong>JavaScript is required to run this application.</strong> Please enable JavaScript and reload the page.</p>
       </noscript>
@@ -342,6 +351,17 @@
     <div class="feedback-link" id="starLink" style="right:200px;">
       <a href="https://github.com/jimbono4-cpu/quickstats" target="_blank" rel="noopener">&#11088; Star on GitHub</a>
     </div>
+    <!-- Persistent footer below the app: internal links for users and crawlers -->
+    <footer style="border-top: 1px solid #e2e8f0; padding: 18px 24px; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; color: #4a5568; background: #fff;">
+      <nav aria-label="Site pages" style="display: flex; flex-wrap: wrap; gap: 6px 16px;">
+        <a href="/table-1-generator/" style="color: #5a67d8; text-decoration: none;">Table 1 generator</a>
+        <a href="/logistic-regression-calculator/" style="color: #5a67d8; text-decoration: none;">Logistic regression calculator</a>
+        <a href="/cox-regression-calculator/" style="color: #5a67d8; text-decoration: none;">Cox regression &amp; survival</a>
+        <a href="/free-spss-alternative/" style="color: #5a67d8; text-decoration: none;">Free SPSS alternative</a>
+        <a href="/privacy/" style="color: #5a67d8; text-decoration: none;">Privacy</a>
+        <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener" style="color: #5a67d8; text-decoration: none;">Open source (MIT)</a>
+      </nav>
+    </footer>
     <script data-goatcounter="https://jimbono4.goatcounter.com/count"
             async src="https://gc.zgo.at/count.js"></script>
   </body>

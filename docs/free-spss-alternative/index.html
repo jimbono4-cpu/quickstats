@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://gc.zgo.at; style-src 'unsafe-inline'; img-src 'self' data: https://jimbono4.goatcounter.com; connect-src https://jimbono4.goatcounter.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free SPSS Alternative That Runs in Your Browser — No Installation | QuickStats</title>
+  <meta name="description" content="A free SPSS alternative for common medical and social-science statistics: Table 1, t-tests, chi-squared, linear/logistic/Cox/Poisson regression, mixed models. Opens .sav files directly. No installation, no licence, fully private.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://quickstats.tools/free-spss-alternative/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://quickstats.tools/free-spss-alternative/">
+  <meta property="og:title" content="Free SPSS Alternative That Runs in Your Browser">
+  <meta property="og:description" content="Opens your .sav files directly. Table 1, regression models, survival analysis — free, no installation, no licence.">
+  <meta property="og:image" content="https://quickstats.tools/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://quickstats.tools/og-image.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "Can it open SPSS .sav files?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes — QuickStats reads SPSS (.sav) files directly, preserving variable labels. It also opens Stata (.dta), SAS (.sas7bdat), Excel, and CSV files."}},
+      {"@type": "Question", "name": "Which SPSS analyses does it cover?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Descriptive statistics and a publication-ready Table 1 (with t-test/ANOVA/Wilcoxon/Kruskal-Wallis/chi-squared/Fisher p-values), linear regression, binary logistic regression with ROC/AUC, Poisson and negative binomial regression, Cox survival analysis with Kaplan-Meier curves, and linear mixed models."}},
+      {"@type": "Question", "name": "Is it really free — what's the catch?",
+       "acceptedAnswer": {"@type": "Answer", "text": "There is no catch: no licence, no trial period, no sign-up, no ads. QuickStats is an open-source academic project. Because it runs in your browser there are no server costs to recover."}},
+      {"@type": "Question", "name": "Is it suitable for sensitive or patient data?",
+       "acceptedAnswer": {"@type": "Answer", "text": "The analysis engine runs entirely inside your browser via WebAssembly, so data never leaves your device — unlike cloud statistics tools. A Content-Security-Policy technically blocks the page from transmitting data. Always follow your institution's data governance rules."}}
+    ]
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: #2d3748; line-height: 1.65; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 14px 24px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 30px; color: #1a202c; line-height: 1.25; margin-bottom: 14px; }
+    h2 { font-size: 21px; color: #2d3748; margin: 30px 0 10px; }
+    p, li { font-size: 16px; margin-bottom: 10px; }
+    ul, ol { padding-left: 24px; margin-bottom: 12px; }
+    table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 15px; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; }
+    th { background: #f7fafc; }
+    .cta { display: inline-block; background: #667eea; color: #fff; padding: 13px 30px;
+           border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 17px; margin: 14px 0; }
+    .cta:hover { background: #5a67d8; }
+    .badges { color: #4a5568; font-size: 14px; margin-bottom: 8px; }
+    footer { border-top: 1px solid #e2e8f0; margin-top: 40px; padding: 22px 24px; font-size: 14px; color: #4a5568; }
+    footer nav a { color: #5a67d8; text-decoration: none; margin-right: 14px; }
+    dt { font-weight: 600; margin-top: 14px; }
+    dd { margin-left: 0; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header><a href="/">QuickStats</a></header>
+  <main>
+    <h1>A Free SPSS Alternative That Runs in Your Browser</h1>
+    <p class="badges">✓ Opens .sav files directly &nbsp; ✓ No licence &nbsp; ✓ No installation &nbsp; ✓ Fully private</p>
+    <p>Need SPSS-style analyses but don't have a licence? <strong>QuickStats runs the R statistical engine inside your browser</strong> — open your existing <strong>.sav files directly</strong> (variable labels included), generate a publication-ready Table 1, and fit regression and survival models. Nothing to install, nothing to pay, and your data never leaves your device.</p>
+    <a class="cta" href="/">Open QuickStats free →</a>
+
+    <h2>SPSS workflows covered</h2>
+    <table>
+      <tr><th>In SPSS</th><th>In QuickStats</th></tr>
+      <tr><td>Descriptives / Explore / Crosstabs</td><td>Data explorer + publication-ready <a href="/table-1-generator/">Table 1</a> with automatic test selection</td></tr>
+      <tr><td>Linear Regression</td><td>Linear regression with coefficient plots and diagnostics</td></tr>
+      <tr><td>Binary Logistic Regression</td><td><a href="/logistic-regression-calculator/">Logistic regression</a> with odds ratios, ROC curve and AUC</td></tr>
+      <tr><td>Cox Regression / Kaplan-Meier</td><td><a href="/cox-regression-calculator/">Cox model</a> with hazard ratios, KM curves, Schoenfeld tests</td></tr>
+      <tr><td>Generalized Linear Models (counts)</td><td>Poisson and negative binomial regression (incidence rate ratios)</td></tr>
+      <tr><td>Mixed Models</td><td>Linear and logistic mixed models with random intercepts and ICC</td></tr>
+    </table>
+
+    <h2>Why researchers use it</h2>
+    <ul>
+      <li><strong>No licence wall</strong> — SPSS costs hundreds per year; QuickStats is free and open source</li>
+      <li><strong>Nothing to install</strong> — works on any managed university or hospital computer where you can't install software</li>
+      <li><strong>Privacy by architecture</strong> — analysis happens in your browser tab, not on a cloud server, which matters for sensitive data</li>
+      <li><strong>Journal-ready output</strong> — tables paste into Word formatted; reports export to PDF/Word with embedded figures</li>
+      <li><strong>Real statistics</strong> — powered by R's standard, validated packages, not a re-implementation</li>
+    </ul>
+
+    <h2>What it doesn't do (yet)</h2>
+    <p>QuickStats focuses on the analyses that appear in most applied papers. It doesn't currently offer factor analysis, repeated-measures ANOVA, or custom syntax. For those you'll still want R, jamovi, or JASP — all also free.</p>
+
+    <h2>Frequently asked questions</h2>
+    <dl>
+      <dt>Can it open SPSS .sav files?</dt>
+      <dd>Yes, directly — variable labels are preserved. Stata, SAS, Excel, and CSV work too.</dd>
+      <dt>Is it really free?</dt>
+      <dd>Yes: no licence, no trial, no sign-up, no ads. It's an open-source academic project with no server costs to recover.</dd>
+      <dt>Can I use it with patient data?</dt>
+      <dd>Data never leaves your device, which removes the usual cloud-tool concern — but always follow your institution's governance rules. <a href="/privacy/">Details</a>.</dd>
+    </dl>
+
+    <h2>More free tools</h2>
+    <p><a href="/table-1-generator/">Table 1 generator</a> · <a href="/logistic-regression-calculator/">Logistic regression calculator</a> · <a href="/cox-regression-calculator/">Cox regression &amp; survival analysis</a></p>
+  </main>
+  <footer>
+    <nav>
+      <a href="/">QuickStats app</a>
+      <a href="/table-1-generator/">Table 1 generator</a>
+      <a href="/logistic-regression-calculator/">Logistic regression</a>
+      <a href="/cox-regression-calculator/">Cox regression</a>
+      <a href="/free-spss-alternative/">SPSS alternative</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+  <script data-goatcounter="https://jimbono4.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

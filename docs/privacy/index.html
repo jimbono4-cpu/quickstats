@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://gc.zgo.at; style-src 'unsafe-inline'; img-src 'self' data: https://jimbono4.goatcounter.com; connect-src https://jimbono4.goatcounter.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy — Your Data Never Leaves Your Browser | QuickStats</title>
+  <meta name="description" content="How QuickStats guarantees privacy: all statistics run in your browser via WebAssembly, there is no server, no accounts, no cookies, and a Content-Security-Policy technically blocks data transmission.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://quickstats.tools/privacy/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://quickstats.tools/privacy/">
+  <meta property="og:title" content="QuickStats Privacy — Your Data Never Leaves Your Browser">
+  <meta property="og:description" content="No server, no accounts, no cookies — and a Content-Security-Policy that technically blocks data transmission.">
+  <meta property="og:image" content="https://quickstats.tools/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: #2d3748; line-height: 1.65; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 14px 24px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 30px; color: #1a202c; line-height: 1.25; margin-bottom: 14px; }
+    h2 { font-size: 21px; color: #2d3748; margin: 30px 0 10px; }
+    p, li { font-size: 16px; margin-bottom: 10px; }
+    ul { padding-left: 24px; margin-bottom: 12px; }
+    footer { border-top: 1px solid #e2e8f0; margin-top: 40px; padding: 22px 24px; font-size: 14px; color: #4a5568; }
+    footer nav a { color: #5a67d8; text-decoration: none; margin-right: 14px; }
+    code { background: #f7fafc; padding: 1px 5px; border-radius: 3px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header><a href="/">QuickStats</a></header>
+  <main>
+    <h1>Privacy: your data never leaves your browser</h1>
+    <p>Most online statistics tools upload your data to a server for processing. QuickStats doesn't — and this page explains how that guarantee works technically, not just as a promise.</p>
+
+    <h2>How the analysis runs</h2>
+    <ul>
+      <li>QuickStats uses <strong>WebR</strong> — the R statistical language compiled to WebAssembly — running entirely inside your browser tab.</li>
+      <li>When you "upload" a file, it is read by JavaScript in your browser and handed to the local R engine. <strong>No network request carries your data.</strong></li>
+      <li>The site is served as static files from GitHub Pages. <strong>There is no application server or database</strong> that could receive or store your data.</li>
+      <li>Closing the tab destroys everything: nothing is retained.</li>
+    </ul>
+
+    <h2>Technically enforced, not just promised</h2>
+    <p>The site ships a <strong>Content-Security-Policy</strong> that restricts where the page is allowed to connect: only this site, the WebR package repository, and our analytics counter. Even if malicious content were somehow injected into the page, the browser itself would block any attempt to transmit your data elsewhere. You can verify this in your browser's developer tools (Network tab) — no request containing your data ever leaves.</p>
+
+    <h2>Analytics</h2>
+    <ul>
+      <li>We use <strong>GoatCounter</strong>, a privacy-respecting, open-source visit counter. It records a page view — not your data, not your identity.</li>
+      <li><strong>No cookies</strong> are set. No advertising or fingerprinting scripts are loaded.</li>
+      <li>What GoatCounter sees: the page visited, referrer, browser type, screen size, and country-level location. Nothing else.</li>
+    </ul>
+
+    <h2>Sensitive and patient data</h2>
+    <p>Because processing is local, using QuickStats is architecturally similar to running R or SPSS on your own machine — the data-leaves-the-institution concern of cloud tools does not apply. That said, your institution's data governance rules still apply to you; check them before analysing identifiable data on any device.</p>
+
+    <h2>Open source</h2>
+    <p>The complete source code is public at <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">github.com/jimbono4-cpu/quickstats</a> (MIT licence), so these claims are auditable. Questions or concerns — <a href="https://github.com/jimbono4-cpu/quickstats/issues" rel="noopener">open an issue</a>.</p>
+  </main>
+  <footer>
+    <nav>
+      <a href="/">QuickStats app</a>
+      <a href="/table-1-generator/">Table 1 generator</a>
+      <a href="/logistic-regression-calculator/">Logistic regression</a>
+      <a href="/cox-regression-calculator/">Cox regression</a>
+      <a href="/free-spss-alternative/">SPSS alternative</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+  <script data-goatcounter="https://jimbono4.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://gc.zgo.at; style-src 'unsafe-inline'; img-src 'self' data: https://jimbono4.goatcounter.com; connect-src https://jimbono4.goatcounter.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Table 1 Generator — Publication-Ready Baseline Characteristics | QuickStats</title>
+  <meta name="description" content="Generate a publication-ready Table 1 (baseline characteristics) free in your browser. Mean (SD), median (IQR), n (%), p-values with automatic test selection. No installation, no sign-up — your data never leaves your device.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://quickstats.tools/table-1-generator/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://quickstats.tools/table-1-generator/">
+  <meta property="og:title" content="Free Table 1 Generator — Publication-Ready Baseline Characteristics">
+  <meta property="og:description" content="Upload your data, tick your variables, and copy a journal-ready Table 1 straight into Word. Free, no sign-up, fully private.">
+  <meta property="og:image" content="https://quickstats.tools/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://quickstats.tools/og-image.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "What is a Table 1 in research?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Table 1 is the first table of most clinical and epidemiological papers. It summarises the baseline characteristics of study participants — continuous variables as mean (SD) or median (IQR), categorical variables as n (%) — usually split by study group, often with p-values comparing groups."}},
+      {"@type": "Question", "name": "Which statistical tests does the Table 1 generator use?",
+       "acceptedAnswer": {"@type": "Answer", "text": "QuickStats picks tests automatically: t-test or one-way ANOVA for normally distributed continuous variables, Wilcoxon rank-sum or Kruskal-Wallis for non-normal ones (with optional Shapiro-Wilk testing), and chi-squared for categorical variables with Fisher's exact test when expected cell counts are below 5. The tests used are listed in a table footnote."}},
+      {"@type": "Question", "name": "Can I paste the table into Microsoft Word?",
+       "acceptedAnswer": {"@type": "Answer", "text": "Yes. One click copies the formatted table to your clipboard; pasting into Word, Google Docs, or PowerPoint preserves the layout. You can also download a full PDF or Word report."}},
+      {"@type": "Question", "name": "Is my data uploaded to a server?",
+       "acceptedAnswer": {"@type": "Answer", "text": "No. QuickStats runs the R statistical language in your browser via WebAssembly. Your file is read locally and never transmitted; a Content-Security-Policy technically prevents the page from sending data anywhere."}}
+    ]
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, sans-serif; color: #2d3748; line-height: 1.65; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 14px 24px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 30px; color: #1a202c; line-height: 1.25; margin-bottom: 14px; }
+    h2 { font-size: 21px; color: #2d3748; margin: 30px 0 10px; }
+    p, li { font-size: 16px; margin-bottom: 10px; }
+    ul, ol { padding-left: 24px; margin-bottom: 12px; }
+    .cta { display: inline-block; background: #667eea; color: #fff; padding: 13px 30px;
+           border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 17px; margin: 14px 0; }
+    .cta:hover { background: #5a67d8; }
+    .badges { color: #4a5568; font-size: 14px; margin-bottom: 8px; }
+    .note { background: #ebf4ff; border-left: 4px solid #667eea; padding: 10px 14px; border-radius: 4px; margin: 14px 0; font-size: 15px; }
+    footer { border-top: 1px solid #e2e8f0; margin-top: 40px; padding: 22px 24px; font-size: 14px; color: #4a5568; }
+    footer nav a { color: #5a67d8; text-decoration: none; margin-right: 14px; }
+    dt { font-weight: 600; margin-top: 14px; }
+    dd { margin-left: 0; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header><a href="/">QuickStats</a></header>
+  <main>
+    <h1>Free Table 1 Generator</h1>
+    <p class="badges">✓ Free &nbsp; ✓ No sign-up &nbsp; ✓ No installation &nbsp; ✓ Data never leaves your browser</p>
+    <p>Turn a spreadsheet into a publication-ready <strong>Table 1 of baseline characteristics</strong> in about a minute. QuickStats formats continuous variables as mean (SD) or median (IQR), categorical variables as n (%), stratifies by any grouping variable, adds p-values with the right statistical test, and copies straight into Word.</p>
+    <a class="cta" href="/">Open the Table 1 generator →</a>
+
+    <h2>How it works</h2>
+    <ol>
+      <li><strong>Upload</strong> a CSV, Excel, Stata, SPSS, or SAS file — or load the built-in example dataset.</li>
+      <li><strong>Tick the variables</strong> to include and choose a stratifying variable (e.g. treatment arm, exposure group).</li>
+      <li><strong>Choose options</strong>: overall column, p-values, and optional normality testing that switches non-normal variables to median (IQR) automatically.</li>
+      <li><strong>Copy to clipboard</strong> and paste directly into your manuscript, or download a PDF/Word report.</li>
+    </ol>
+
+    <h2>What the table includes</h2>
+    <ul>
+      <li>Mean (SD) or median (IQR) for continuous variables — chosen by Shapiro-Wilk normality testing if you enable it</li>
+      <li>n (%) for every level of categorical variables, with percentages among non-missing observations</li>
+      <li>A Missing row per variable, so incomplete data is reported transparently</li>
+      <li>Group columns with sample sizes, e.g. <em>Treatment (N=150)</em>, plus an optional Overall column</li>
+      <li>P-values from t-test / ANOVA / Wilcoxon / Kruskal-Wallis / chi-squared / Fisher's exact — selected automatically and listed in the footnote</li>
+    </ul>
+
+    <div class="note"><strong>Privacy:</strong> all statistics are computed by R compiled to WebAssembly, running inside your browser tab. Nothing is uploaded — there is no server. <a href="/privacy/">How we guarantee this →</a></div>
+
+    <h2>Frequently asked questions</h2>
+    <dl>
+      <dt>What is a Table 1 in research?</dt>
+      <dd>The first table of most clinical and epidemiological papers: a summary of participants' baseline characteristics, usually split by study group, with p-values comparing groups.</dd>
+      <dt>Which statistical tests are used?</dt>
+      <dd>t-test or ANOVA for normal continuous variables, Wilcoxon or Kruskal-Wallis for non-normal, chi-squared for categorical with Fisher's exact when expected cell counts are small. The footnote lists exactly which tests were applied.</dd>
+      <dt>Can I paste the table into Word?</dt>
+      <dd>Yes — one click copies formatted HTML that pastes cleanly into Word, Google Docs, or PowerPoint.</dd>
+      <dt>Is my data uploaded anywhere?</dt>
+      <dd>No. Analysis runs locally in your browser; a Content-Security-Policy technically prevents the page from transmitting your data.</dd>
+    </dl>
+
+    <h2>More free tools</h2>
+    <p><a href="/logistic-regression-calculator/">Logistic regression calculator</a> · <a href="/cox-regression-calculator/">Cox regression &amp; survival analysis</a> · <a href="/free-spss-alternative/">Free SPSS alternative</a></p>
+  </main>
+  <footer>
+    <nav>
+      <a href="/">QuickStats app</a>
+      <a href="/table-1-generator/">Table 1 generator</a>
+      <a href="/logistic-regression-calculator/">Logistic regression</a>
+      <a href="/cox-regression-calculator/">Cox regression</a>
+      <a href="/free-spss-alternative/">SPSS alternative</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/jimbono4-cpu/quickstats" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
+  <script data-goatcounter="https://jimbono4.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>
