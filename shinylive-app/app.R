@@ -175,6 +175,53 @@ is_exp_model <- function(model_type, binary_mixed = FALSE) {
     (model_type == "lmer" && isTRUE(binary_mixed))
 }
 
+#' Colourblind-safe categorical palette (Okabe-Ito order) for stratified plots
+okabe_ito <- c("#0072B2", "#D55E00", "#009E73", "#CC79A7",
+               "#E69F00", "#56B4E9", "#F0E442", "#999999")
+
+#' Publication-style forest plot. Estimates render as an aligned text column
+#' in a reserved zone to the right of the widest whisker, so labels can never
+#' overlap the error bars. Ratio estimates (OR/HR/IRR) use a log scale so
+#' e.g. 0.5 and 2.0 sit equidistant from the reference line.
+#' plot_df needs columns: term, est, lo, hi.
+build_forest_plot <- function(plot_df, title, x_label, ref_line = 1,
+                              log_scale = TRUE) {
+  plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
+  plot_df$label <- paste0(format(round(plot_df$est, 2), trim = TRUE), " [",
+                          format(round(plot_df$lo, 2), trim = TRUE), ", ",
+                          format(round(plot_df$hi, 2), trim = TRUE), "]")
+  if (log_scale) {
+    lmin <- log(min(c(plot_df$lo, ref_line), na.rm = TRUE))
+    lmax <- log(max(c(plot_df$hi, ref_line), na.rm = TRUE))
+    span <- max(lmax - lmin, 0.5)
+    plot_df$x_lab <- exp(lmax + 0.08 * span)
+    x_limits <- c(exp(lmin - 0.05 * span), exp(lmax + 0.62 * span))
+  } else {
+    rmin <- min(c(plot_df$lo, ref_line), na.rm = TRUE)
+    rmax <- max(c(plot_df$hi, ref_line), na.rm = TRUE)
+    span <- max(rmax - rmin, 1e-6)
+    plot_df$x_lab <- rmax + 0.08 * span
+    x_limits <- c(rmin - 0.05 * span, rmax + 0.62 * span)
+  }
+  p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
+    ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey55") +
+    ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
+                            height = 0.22, color = "#4e79a7", linewidth = 0.8) +
+    ggplot2::geom_point(size = 3.2, color = "#4e79a7") +
+    ggplot2::geom_text(ggplot2::aes(x = x_lab, label = label),
+                       hjust = 0, size = 3.1, color = "grey15") +
+    ggplot2::labs(title = title, x = x_label, y = "") +
+    ggplot2::theme_minimal(base_size = 13) +
+    ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
+                   plot.title = ggplot2::element_text(face = "bold", size = 13),
+                   plot.title.position = "plot")
+  if (log_scale) {
+    p + ggplot2::scale_x_log10(limits = x_limits)
+  } else {
+    p + ggplot2::scale_x_continuous(limits = x_limits)
+  }
+}
+
 #' AUC with Hanley-McNeil 95% CI, computed from predicted probabilities and a
 #' 0/1 outcome via the Mann-Whitney statistic (no pROC dependency).
 calc_auc <- function(pred, obs) {
@@ -1718,32 +1765,27 @@ model_server <- function(id, shared) {
       plot_df <- tidy_df[tidy_df$term != "(Intercept)", ]
       if (nrow(plot_df) == 0) return(NULL)
 
-      if ("OR_HR" %in% names(plot_df)) {
-        plot_df$est <- plot_df$OR_HR
-        plot_df$lo <- plot_df$ci_lower
-        plot_df$hi <- plot_df$ci_upper
-        x_label <- sub("s$", "", exp_label_full(input$model_type))
-        ref_line <- 1
-      } else {
-        plot_df$est <- plot_df$estimate
-        plot_df$lo <- plot_df$conf.low
-        plot_df$hi <- plot_df$conf.high
-        x_label <- "Coefficient"
-        ref_line <- 0
-      }
-
-      plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
-
       miss_info <- model_missing_info()
       n_diag <- if (!is.null(miss_info)) miss_info$n_used else "?"
 
-      ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
-        ggplot2::geom_point(size = 3, color = "#4e79a7") +
-        ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi), height = 0.2, color = "#4e79a7") +
-        ggplot2::geom_vline(xintercept = ref_line, linetype = "dashed", color = "grey50") +
-        ggplot2::labs(title = paste0("Forest Plot — All Predictors (N = ", n_diag, ")"),
-                      x = x_label, y = "") +
-        ggplot2::theme_minimal(base_size = 14)
+      if ("OR_HR" %in% names(plot_df)) {
+        plot_df$est <- as.numeric(plot_df$OR_HR)
+        plot_df$lo <- as.numeric(plot_df$ci_lower)
+        plot_df$hi <- as.numeric(plot_df$ci_upper)
+        build_forest_plot(plot_df,
+          title = paste0("Forest Plot - All Predictors (N = ", n_diag, ")"),
+          x_label = paste0(sub("s$", "", exp_label_full(input$model_type)),
+                           " (95% CI, log scale)"),
+          ref_line = 1, log_scale = TRUE)
+      } else {
+        plot_df$est <- as.numeric(plot_df$estimate)
+        plot_df$lo <- as.numeric(plot_df$conf.low)
+        plot_df$hi <- as.numeric(plot_df$conf.high)
+        build_forest_plot(plot_df,
+          title = paste0("Forest Plot - All Predictors (N = ", n_diag, ")"),
+          x_label = "Coefficient (95% CI)",
+          ref_line = 0, log_scale = FALSE)
+      }
     })
 
     output$forest_plot <- renderPlot({
@@ -1915,23 +1957,10 @@ model_server <- function(id, shared) {
           plot_df$lo <- as.numeric(plot_df$ci_lower)
           plot_df$hi <- as.numeric(plot_df$ci_upper)
           est_label <- exp_label_full(mtype)
-          x_label <- paste0(est_label, " (95% CI)")
-          plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
-          plot_df$label <- paste0(round(plot_df$est, 2), " [",
-                                  round(plot_df$lo, 2), "-", round(plot_df$hi, 2), "]")
-          forest_p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
-            ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "grey50") +
-            ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
-            ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
-                                    height = 0.25, color = "#4e79a7", linewidth = 0.8) +
-            ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
-            ggplot2::labs(
-              title = paste0("Forest Plot: ", est_label, " (N = ", n_analytical, ")"),
-              x = x_label, y = "") +
-            ggplot2::theme_minimal(base_size = 13) +
-            ggplot2::theme(
-              panel.grid.major.y = ggplot2::element_blank(),
-              plot.title = ggplot2::element_text(face = "bold"))
+          forest_p <- build_forest_plot(plot_df,
+            title = paste0("Forest Plot: ", est_label, " (N = ", n_analytical, ")"),
+            x_label = paste0(est_label, " (95% CI, log scale)"),
+            ref_line = 1, log_scale = TRUE)
           plot_list <- c(plot_list, list(forest_p))
         }
       } else {
@@ -1946,22 +1975,10 @@ model_server <- function(id, shared) {
           plot_df$est <- unname(as.numeric(plot_df$estimate))
           plot_df$lo <- unname(as.numeric(plot_df$conf.low))
           plot_df$hi <- unname(as.numeric(plot_df$conf.high))
-          plot_df$term <- factor(plot_df$term, levels = rev(plot_df$term))
-          plot_df$label <- paste0(round(plot_df$est, 2), " [",
-                                  round(plot_df$lo, 2), ", ", round(plot_df$hi, 2), "]")
-          forest_p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = est, y = term)) +
-            ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
-            ggplot2::geom_point(size = 3.5, color = "#4e79a7") +
-            ggplot2::geom_errorbarh(ggplot2::aes(xmin = lo, xmax = hi),
-                                    height = 0.25, color = "#4e79a7", linewidth = 0.8) +
-            ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.15, size = 3.2) +
-            ggplot2::labs(
-              title = paste0("Forest Plot: Coefficients (N = ", n_analytical, ")"),
-              x = "Coefficient (95% CI)", y = "") +
-            ggplot2::theme_minimal(base_size = 13) +
-            ggplot2::theme(
-              panel.grid.major.y = ggplot2::element_blank(),
-              plot.title = ggplot2::element_text(face = "bold"))
+          forest_p <- build_forest_plot(plot_df,
+            title = paste0("Forest Plot: Coefficients (N = ", n_analytical, ")"),
+            x_label = "Coefficient (95% CI)",
+            ref_line = 0, log_scale = FALSE)
           plot_list <- c(plot_list, list(forest_p))
         }
       }
@@ -1978,12 +1995,14 @@ model_server <- function(id, shared) {
               ggplot2::geom_line(color = "#4e79a7", linewidth = 1) +
               ggplot2::coord_equal() +
               ggplot2::labs(
-                title = paste0("ROC Curve - AUC = ", round(a$auc, 3),
-                               " (95% CI ", round(a$lo, 3), "-", round(a$hi, 3), ")"),
+                title = paste0("ROC Curve"),
+                subtitle = paste0("AUC = ", round(a$auc, 2),
+                                  " (95% CI ", round(a$lo, 2), " to ", round(a$hi, 2), ")"),
                 x = "False positive rate (1 - specificity)",
                 y = "True positive rate (sensitivity)") +
               ggplot2::theme_minimal(base_size = 13) +
-              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+              ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
+                             plot.title.position = "plot")
           }
         }, error = function(e) NULL)
         if (!is.null(roc_p)) plot_list <- c(plot_list, list(roc_p))
@@ -2010,17 +2029,31 @@ model_server <- function(id, shared) {
                 strata = rep(names(km_fit$strata), km_fit$strata)
               )
               km_data$strata <- gsub(paste0("^", km_var, "="), "", km_data$strata)
-              ggplot2::ggplot(km_data, ggplot2::aes(x = time, y = surv, color = strata)) +
-                ggplot2::geom_step(linewidth = 0.9) +
-                ggplot2::geom_step(ggplot2::aes(y = lower), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
-                ggplot2::geom_step(ggplot2::aes(y = upper), linetype = "dashed", alpha = 0.4, linewidth = 0.4) +
+              n_strata <- length(unique(km_data$strata))
+              km_gg <- ggplot2::ggplot(km_data,
+                                       ggplot2::aes(x = time, y = surv, color = strata)) +
+                ggplot2::geom_step(linewidth = 0.9)
+              # CI bands only for <=2 groups — beyond that they turn to noise
+              if (n_strata <= 2) {
+                km_gg <- km_gg +
+                  ggplot2::geom_step(ggplot2::aes(y = lower), linetype = "dashed",
+                                     alpha = 0.4, linewidth = 0.4) +
+                  ggplot2::geom_step(ggplot2::aes(y = upper), linetype = "dashed",
+                                     alpha = 0.4, linewidth = 0.4)
+              }
+              km_gg +
+                ggplot2::scale_color_manual(values = rep(okabe_ito,
+                                                         length.out = n_strata)) +
                 ggplot2::labs(
                   title = paste0("Kaplan-Meier Survival Curve by ", km_var, " (N = ", n_analytical, ")"),
+                  subtitle = if (n_strata <= 2) "Dashed lines: 95% confidence bands" else NULL,
                   x = "Time", y = "Survival Probability",
                   color = km_var, fill = km_var) +
                 ggplot2::scale_y_continuous(limits = c(0, 1)) +
                 ggplot2::theme_minimal(base_size = 13) +
-                ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "bottom")
+                ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
+                               plot.title.position = "plot",
+                               legend.position = "bottom")
             }, error = function(e) NULL)
             if (!is.null(km_p)) plot_list <- c(plot_list, list(km_p))
           }

@@ -131,6 +131,24 @@ record("AUC CI is a proper interval", a$lo <= a$auc && a$auc <= a$hi)
 record("degenerate outcome returns NULL", is.null(calc_auc(runif(10), rep(1, 10))))
 
 # ---------------------------------------------------------------------------
+# 6b. build_forest_plot (label column must sit clear of the widest whisker)
+# ---------------------------------------------------------------------------
+cat("--- 6b. build_forest_plot ---\n")
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  fp_df <- data.frame(term = c("a", "b"), est = c(2.0, 0.8),
+                      lo = c(1.1, 0.5), hi = c(3.6, 1.3))
+  p <- build_forest_plot(fp_df, title = "t", x_label = "x",
+                         ref_line = 1, log_scale = TRUE)
+  record("returns a ggplot object", inherits(p, "ggplot"))
+  record("label anchor sits right of the widest whisker",
+         all(p$data$x_lab > max(fp_df$hi)))
+  p2 <- build_forest_plot(fp_df, title = "t", x_label = "x",
+                          ref_line = 0, log_scale = FALSE)
+  record("linear variant anchors labels clear of whiskers",
+         all(p2$data$x_lab > max(fp_df$hi)))
+}
+
+# ---------------------------------------------------------------------------
 # 7. friendly_model_error
 # ---------------------------------------------------------------------------
 cat("--- 7. friendly_model_error ---\n")
