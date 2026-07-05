@@ -175,6 +175,19 @@ is_exp_model <- function(model_type, binary_mixed = FALSE) {
     (model_type == "lmer" && isTRUE(binary_mixed))
 }
 
+#' Number of observations actually used by a fitted model. Note nobs() on a
+#' coxph object returns the number of EVENTS, not subjects — handle survival
+#' models explicitly so sample sizes are reported correctly.
+n_obs_used <- function(mod) {
+  if (inherits(mod, "coxph")) return(mod$n)
+  tryCatch(nobs(mod), error = function(e) NA_integer_)
+}
+
+#' Number of events for survival models (NULL otherwise)
+n_events_of <- function(mod) {
+  if (inherits(mod, "coxph")) mod$nevent else NULL
+}
+
 #' Colourblind-safe categorical palette (Okabe-Ito order) for stratified plots
 okabe_ito <- c("#0072B2", "#D55E00", "#009E73", "#CC79A7",
                "#E69F00", "#56B4E9", "#F0E442", "#999999")
@@ -1476,9 +1489,11 @@ model_server <- function(id, shared) {
 
         # Calculate observations dropped due to missing data
         n_total <- nrow(df)
-        n_used <- nobs(mod)
+        n_used <- n_obs_used(mod)
         n_dropped <- n_total - n_used
-        model_missing_info(list(n_total = n_total, n_used = n_used, n_dropped = n_dropped))
+        model_missing_info(list(n_total = n_total, n_used = n_used,
+                                n_dropped = n_dropped,
+                                n_events = n_events_of(mod)))
 
         if (n_dropped > 0) {
           showNotification(
@@ -1923,15 +1938,17 @@ model_server <- function(id, shared) {
     # Track number of plots for dynamic height
     n_plots <- reactiveVal(1)
 
-    # The reactive that builds the plot object
-    current_plot <- reactive({
+    # The reactive that builds the list of model plots (forest, ROC, KM, ...).
+    # Reports embed each figure separately (tall stacked composites get sliced
+    # across PDF pages); the stacked view below is only for on-screen display.
+    current_plot_list <- reactive({
       mod <- model_fit()
       if (is.null(mod)) return(NULL)
       mtype <- input$model_type
 
       # Get analytical sample size for titles
       miss_info <- model_missing_info()
-      n_analytical <- if (!is.null(miss_info)) miss_info$n_used else nobs(mod)
+      n_analytical <- if (!is.null(miss_info)) miss_info$n_used else n_obs_used(mod)
 
       tidy_df <- model_tidy()
       if (is.null(tidy_df)) return(NULL)
@@ -2011,8 +2028,14 @@ model_server <- function(id, shared) {
       # --- KM survival curve (Cox only — always shown) ---
       if (mtype == "cox") {
         if (requireNamespace("survival", quietly = TRUE)) {
+          # The stratify-by control only exists once the Plots tab has been
+          # rendered; before that (e.g. fit -> straight to Step 5 export)
+          # fall back to the first predictor so the KM is never silently lost.
           km_var <- input$km_strata
-          if (!is.null(km_var) && km_var %in% names(shared$data)) {
+          if (is.null(km_var) || !(km_var %in% names(shared$data))) {
+            km_var <- intersect(input$predictors, names(shared$data))[1]
+          }
+          if (!is.null(km_var) && !is.na(km_var) && km_var %in% names(shared$data)) {
             km_p <- tryCatch({
               df <- shared$data
               if (!is.null(shared$var_types)) df <- prepare_model_data(df, shared$var_types)
@@ -2096,23 +2119,22 @@ model_server <- function(id, shared) {
         }
       }
 
-      # Return: if no plots, return NULL
-      if (length(plot_list) == 0) return(NULL)
-
       # Set plot count for dynamic height
       n_plots(length(plot_list))
+      plot_list
+    })
 
-      # Arrange all plots vertically tiled (one per row)
-      if (length(plot_list) == 1) {
-        plot_list[[1]]
-      } else {
-        tryCatch({
-          install_if_needed("gridExtra")
-          shared$pkgs_used <- union(shared$pkgs_used, "gridExtra")
-          do.call(gridExtra::grid.arrange,
-                  c(plot_list, ncol = 1))
-        }, error = function(e) plot_list[[1]])
-      }
+    # Stacked composite of all plots — for on-screen display and the
+    # download/copy-plot buttons only (reports embed figures individually)
+    current_plot <- reactive({
+      plot_list <- current_plot_list()
+      if (length(plot_list) == 0) return(NULL)
+      if (length(plot_list) == 1) return(plot_list[[1]])
+      tryCatch({
+        install_if_needed("gridExtra")
+        shared$pkgs_used <- union(shared$pkgs_used, "gridExtra")
+        do.call(gridExtra::grid.arrange, c(plot_list, ncol = 1))
+      }, error = function(e) plot_list[[1]])
     })
 
     # Dynamic plot height — one plot = 500px, stacked vertically 500px each
@@ -2195,6 +2217,38 @@ model_server <- function(id, shared) {
         }
       }
 
+      # ROC curve description (logistic) — order matches the plot list
+      if (mtype == "glm" && !is.null(shared$model_auc)) {
+        a <- shared$model_auc
+        plot_descriptions <- c(plot_descriptions, list(list(
+          type = "roc_curve",
+          title = paste0("ROC Curve (AUC = ", round(a$auc, 3), ")"),
+          description = paste0(
+            "Receiver operating characteristic curve for the logistic model. ",
+            "AUC = ", round(a$auc, 3), " (95% CI ", round(a$lo, 3), " to ",
+            round(a$hi, 3), "); ", a$n_events, " events, ",
+            a$n_nonevents, " non-events.")
+        )))
+      }
+
+      # Kaplan-Meier description (Cox) — mirrors the fallback in the plot list
+      if (mtype == "cox") {
+        km_var <- input$km_strata
+        if (is.null(km_var) || !(km_var %in% names(shared$data))) {
+          km_var <- intersect(input$predictors, names(shared$data))[1]
+        }
+        if (!is.null(km_var) && !is.na(km_var)) {
+          plot_descriptions <- c(plot_descriptions, list(list(
+            type = "km_curve",
+            title = paste0("Kaplan-Meier Survival Curve by ", km_var),
+            description = paste0(
+              "Kaplan-Meier survival curves stratified by ", km_var,
+              ", with 95% confidence bands shown as dashed lines when there ",
+              "are two or fewer groups.")
+          )))
+        }
+      }
+
       # Additional exposure vs outcome plots (lm/lmer scatter)
       if (mtype %in% c("lm", "lmer") && !is.null(input$plot_type_lm) && input$plot_type_lm == "scatter") {
         sel_vars <- input$plot_vars
@@ -2227,32 +2281,14 @@ model_server <- function(id, shared) {
         }
       }
 
-      # ROC curve description (logistic)
-      if (mtype == "glm" && !is.null(shared$model_auc)) {
-        a <- shared$model_auc
-        plot_descriptions <- c(plot_descriptions, list(list(
-          type = "roc_curve",
-          title = paste0("ROC Curve (AUC = ", round(a$auc, 3), ")"),
-          description = paste0(
-            "Receiver operating characteristic curve for the logistic model. ",
-            "AUC = ", round(a$auc, 3), " (95% CI ", round(a$lo, 3), " to ",
-            round(a$hi, 3), "); ", a$n_events, " events, ",
-            a$n_nonevents, " non-events.")
-        )))
-      }
-
       shared$plots <- plot_descriptions
     })
 
-    # Generate base64 PNG of the current plot for embedding in reports
-    get_plot_base64 <- function() {
-      p <- current_plot()
-      if (is.null(p)) return(NULL)
+    # Render one plot object to a base64 PNG data URI
+    render_plot_b64 <- function(p, height = 500) {
       tryCatch({
-        # Scale height based on number of plots
-        img_height <- n_plots() * 500
         tmp <- tempfile(fileext = ".png")
-        grDevices::png(tmp, width = 800, height = img_height, res = 120)
+        grDevices::png(tmp, width = 800, height = height, res = 120)
         if (inherits(p, "ggplot")) {
           print(p)
         } else {
@@ -2268,6 +2304,23 @@ model_server <- function(id, shared) {
         tryCatch(grDevices::dev.off(), error = function(e2) NULL)
         NULL
       })
+    }
+
+    # Stacked composite (download/copy buttons)
+    get_plot_base64 <- function() {
+      p <- current_plot()
+      if (is.null(p)) return(NULL)
+      render_plot_b64(p, height = n_plots() * 500)
+    }
+
+    # One image per figure — used by reports so no figure is taller than a
+    # page (tall composites get sliced across PDF page boundaries)
+    get_plot_base64_list <- function() {
+      pl <- current_plot_list()
+      if (length(pl) == 0) return(NULL)
+      out <- lapply(pl, render_plot_b64)
+      out <- out[!vapply(out, is.null, logical(1))]
+      if (length(out) == 0) NULL else out
     }
 
     # Download plot as PNG
@@ -2300,16 +2353,17 @@ model_server <- function(id, shared) {
       session$sendCustomMessage("copyPlotToClipboard", list(data = b64))
     })
 
-    # Store base64 for report use — re-generate once whenever current_plot
-    # changes. (No invalidateLater here: a timer would re-render the PNG every
-    # tick for the rest of the session, burning CPU inside WASM.)
+    # Store per-figure base64 images for reports — re-generate once whenever
+    # the plot list changes. (No invalidateLater here: a timer would re-render
+    # the PNGs every tick for the rest of the session, burning CPU in WASM.)
     observe({
-      p <- current_plot()
-      if (is.null(p)) {
-        shared$plot_base64 <- NULL
+      pl <- tryCatch(current_plot_list(), error = function(e) NULL)
+      if (is.null(pl) || length(pl) == 0) {
+        shared$plot_base64_list <- NULL
         return()
       }
-      shared$plot_base64 <- tryCatch(get_plot_base64(), error = function(e) NULL)
+      shared$plot_base64_list <- tryCatch(get_plot_base64_list(),
+                                          error = function(e) NULL)
     })
   })
 }
@@ -2382,13 +2436,10 @@ results_server <- function(id, shared) {
     })
 
     output$show_plots <- renderUI({
-      b64 <- shared$plot_base64
+      b64_list <- shared$plot_base64_list
       plots_desc <- shared$plots
-      diag_b64 <- shared$diagnostics_plot_base64
-      diag_desc <- shared$diagnostics_plot
 
-      has_plots <- (!is.null(b64) && nchar(b64) > 0) ||
-                   (!is.null(diag_b64) && nchar(diag_b64) > 0)
+      has_plots <- !is.null(b64_list) && length(b64_list) > 0
 
       if (!has_plots) {
         return(p(class = "text-muted", "No plots generated yet. Go to Step 4 > Plots tab or Diagnostics tab."))
@@ -2397,40 +2448,21 @@ results_server <- function(id, shared) {
       items <- list()
       fig_num <- 0
 
-      # Custom plots from Plots tab (ONE image, possibly with multiple descriptions)
-      if (!is.null(b64) && nchar(b64) > 0) {
-        fig_num <- fig_num + 1
-        plot_title <- "Model Plots"
-        plot_desc_text <- ""
-
-        if (!is.null(plots_desc) && length(plots_desc) > 0) {
-          # Use first plot description's title (should be only one for faceted plots)
-          plot_title <- plots_desc[[1]]$title
-          # Combine all descriptions
-          plot_desc_text <- paste(sapply(plots_desc, function(pd) pd$description), collapse = " ")
+      # Model plots — one figure per image, captioned by position
+      if (!is.null(b64_list) && length(b64_list) > 0) {
+        for (i in seq_along(b64_list)) {
+          fig_num <- fig_num + 1
+          pd <- if (!is.null(plots_desc) && length(plots_desc) >= i) plots_desc[[i]] else NULL
+          plot_title <- if (!is.null(pd) && !is.null(pd$title)) pd$title else "Model plot"
+          items <- c(items, list(
+            h5(paste0("Figure ", fig_num, ": ", plot_title)),
+            tags$img(src = b64_list[[i]],
+                     style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
+            if (!is.null(pd) && !is.null(pd$description))
+              p(style = "color:#666; font-size:0.9em;", pd$description),
+            hr()
+          ))
         }
-
-        items <- c(items, list(
-          h5(paste0("Figure ", fig_num, ": ", plot_title)),
-          tags$img(src = b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
-          if (nchar(plot_desc_text) > 0) p(style = "color:#666; font-size:0.9em;", plot_desc_text),
-          hr()
-        ))
-      }
-
-      # Diagnostics forest plot
-      if (!is.null(diag_b64) && nchar(diag_b64) > 0) {
-        fig_num <- fig_num + 1
-        diag_title <- "Forest Plot (All Predictors)"
-        if (!is.null(diag_desc)) {
-          diag_title <- diag_desc$title
-        }
-        items <- c(items, list(
-          h5(paste0("Figure ", fig_num, ": ", diag_title)),
-          tags$img(src = diag_b64, style = "max-width:100%; height:auto; border:1px solid #ddd; margin-bottom:10px;"),
-          p(style = "color:#666; font-size:0.9em;",
-            if (!is.null(diag_desc)) diag_desc$description else "")
-        ))
       }
 
       tagList(items)
@@ -2914,7 +2946,7 @@ results_server <- function(id, shared) {
       # Regression model
       if (!is.null(shared$model_result)) {
         res <- shared$model_result
-        n_model <- tryCatch(nobs(res$fit), error = function(e) NULL)
+        n_model <- tryCatch(n_obs_used(res$fit), error = function(e) NULL)
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
         model_desc <- switch(res$type,
           "lm" = "Multivariable linear regression was used to estimate regression coefficients with 95% confidence intervals.",
@@ -2934,16 +2966,18 @@ results_server <- function(id, shared) {
         if (!is.null(n_model) && !is.null(shared$data)) {
           n_total <- nrow(shared$data)
           n_dropped <- n_total - n_model
+          n_ev <- n_events_of(res$fit)
+          events_text <- if (!is.null(n_ev)) paste0(" (", n_ev, " events)") else ""
           if (n_dropped > 0) {
             parts <- c(parts, paste0(
               "Complete case analysis was used; ", n_dropped, " observations (",
               round(100 * n_dropped / n_total, 1),
               "%) were excluded due to missing data, yielding an analytical sample of ",
-              n_model, " observations."))
+              n_model, " observations", events_text, "."))
           } else {
             parts <- c(parts, paste0(
               "There were no missing data in the analytical variables; all ",
-              n_model, " observations were included."))
+              n_model, " observations were included", events_text, "."))
           }
         }
 
@@ -2980,7 +3014,7 @@ results_server <- function(id, shared) {
       paste(parts, collapse = " ")
     }
 
-    generate_html_report <- function() {
+    generate_html_report <- function(include_figures = TRUE) {
       # Use the exact same rendered HTML from the app for Table 1 and Table 2
       table1_html <- ""
       table1_title <- ""
@@ -3006,7 +3040,7 @@ results_server <- function(id, shared) {
         # Extract title for the section header
         if (!is.null(shared$model_result)) {
           res <- shared$model_result
-          n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+          n_model <- tryCatch(n_obs_used(res$fit), error = function(e) "?")
           is_binary_mixed <- isTRUE(res$is_binary_mixed)
           estimate_desc <- estimate_description(res$type, is_binary_mixed)
           table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
@@ -3034,7 +3068,7 @@ results_server <- function(id, shared) {
         display_df$statistic <- round(display_df$statistic, 3)
         display_df$p.value <- ifelse(display_df$p.value < 0.001, "<0.001",
                                      round(display_df$p.value, 4))
-        n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+        n_model <- tryCatch(n_obs_used(res$fit), error = function(e) "?")
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
         estimate_desc <- estimate_description(res$type, is_binary_mixed)
         table2_title <- paste0("Table 2. ", estimate_desc, " (N = ", n_model, ")")
@@ -3102,54 +3136,48 @@ results_server <- function(id, shared) {
                         regression_html, fit_stats_html)
       }
 
-      # Plots section
+      # Plots section — one figure per image. For the PDF export figures are
+      # excluded here and appended as native jsPDF pages instead (html2canvas
+      # paints images unreliably inside the shinylive iframe). Word keeps
+      # them inline. (The Diagnostics-tab forest is not repeated: it
+      # duplicates the Figure 1 forest.)
       fig_num <- 0
-      has_figures <- (!is.null(shared$plot_base64) && nchar(shared$plot_base64) > 0) ||
-                     (!is.null(shared$diagnostics_plot_base64) && nchar(shared$diagnostics_plot_base64) > 0)
+      b64_list <- if (include_figures) shared$plot_base64_list else NULL
+      has_figures <- !is.null(b64_list) && length(b64_list) > 0
 
       if (has_figures) {
         html <- paste0(html, '<h2>Figures</h2>')
       }
 
-      # Custom plots from Plots tab
-      if (!is.null(shared$plot_base64) && nchar(shared$plot_base64) > 0) {
-        plot_title <- "Model Plots"
-        if (!is.null(shared$plots) && length(shared$plots) > 0) {
-          plot_title <- shared$plots[[1]]$title
-          fig_num <- fig_num + 1
-        }
-        html <- paste0(html,
-          '<p><strong>Figure ', fig_num, ': ', htmltools::htmlEscape(plot_title), '</strong></p>',
-          '<img src="', shared$plot_base64, '" ',
+      fig_block <- function(fig_num, title, img_src, desc, alt) {
+        paste0(
+          # Each figure starts on its own page: an explicit break is the one
+          # pagination mechanism html2pdf handles reliably, and a 500px figure
+          # always fits within a fresh A4 page.
+          '<div style="page-break-before: always; break-before: page; ',
+          'page-break-inside: avoid; break-inside: avoid;">',
+          '<p><strong>Figure ', fig_num, ': ', htmltools::htmlEscape(title), '</strong></p>',
+          '<img src="', img_src, '" ',
           'style="max-width:100%; height:auto; border:1px solid #ddd; margin:10px 0;" ',
-          'alt="Model plot" />')
-        # Add figure descriptions
-        if (!is.null(shared$plots) && length(shared$plots) > 0) {
-          html <- paste0(html, '<p style="font-size:0.9em; color:#666;">')
-          for (pd in shared$plots) {
-            html <- paste0(html, htmltools::htmlEscape(pd$description), '<br/>')
-          }
-          html <- paste0(html, '</p>')
-        }
+          'alt="', htmltools::htmlEscape(alt), '" />',
+          if (!is.null(desc) && nchar(desc) > 0) {
+            paste0('<p style="font-size:0.9em; color:#666;">',
+                   htmltools::htmlEscape(desc), '</p>')
+          } else "",
+          '</div>')
       }
 
-      # Diagnostics forest plot
-      if (!is.null(shared$diagnostics_plot_base64) && nchar(shared$diagnostics_plot_base64) > 0) {
-        fig_num <- fig_num + 1
-        diag_title <- "Forest Plot"
-        if (!is.null(shared$diagnostics_plot)) {
-          diag_title <- shared$diagnostics_plot$title
-        }
-        html <- paste0(html,
-          '<p><strong>Figure ', fig_num, ': ', htmltools::htmlEscape(diag_title), '</strong></p>',
-          '<img src="', shared$diagnostics_plot_base64, '" ',
-          'style="max-width:100%; height:auto; border:1px solid #ddd; margin:10px 0;" ',
-          'alt="Forest plot" />')
-        if (!is.null(shared$diagnostics_plot)) {
-          html <- paste0(html,
-            '<p style="font-size:0.9em; color:#666;">',
-            htmltools::htmlEscape(shared$diagnostics_plot$description),
-            '</p>')
+      # Model plots (forest / ROC / KM / exposure plots)
+      if (!is.null(b64_list) && length(b64_list) > 0) {
+        for (i in seq_along(b64_list)) {
+          fig_num <- fig_num + 1
+          pd <- if (!is.null(shared$plots) && length(shared$plots) >= i) shared$plots[[i]] else NULL
+          html <- paste0(html, fig_block(
+            fig_num,
+            if (!is.null(pd) && !is.null(pd$title)) pd$title else "Model plot",
+            b64_list[[i]],
+            if (!is.null(pd)) pd$description else NULL,
+            "Model plot"))
         }
       }
 
@@ -3198,7 +3226,7 @@ results_server <- function(id, shared) {
       if (!is.null(shared$model_result)) {
         res <- shared$model_result
         tidy_df <- res$tidy
-        n_model <- tryCatch(nobs(res$fit), error = function(e) "?")
+        n_model <- tryCatch(n_obs_used(res$fit), error = function(e) "?")
         is_binary_mixed <- isTRUE(res$is_binary_mixed)
         estimate_desc <- toupper(estimate_description(res$type, is_binary_mixed))
 
@@ -3276,10 +3304,27 @@ results_server <- function(id, shared) {
       paste(lines, collapse = "\n")
     }
 
-    # Download as PDF via browser print dialog
+    # Download as PDF: text/tables via html2pdf, figures appended as native
+    # jsPDF image pages (bypasses html2canvas, which paints images
+    # unreliably inside the shinylive iframe)
     observeEvent(input$download_pdf, {
-      html_report <- generate_html_report()
-      session$sendCustomMessage("downloadPDF", list(content = html_report))
+      html_report <- generate_html_report(include_figures = FALSE)
+      figs <- list()
+      b64l <- shared$plot_base64_list
+      if (!is.null(b64l) && length(b64l) > 0) {
+        for (i in seq_along(b64l)) {
+          pd <- if (!is.null(shared$plots) && length(shared$plots) >= i) {
+            shared$plots[[i]]
+          } else NULL
+          figs[[length(figs) + 1]] <- list(
+            title = if (!is.null(pd) && !is.null(pd$title)) pd$title else "Model plot",
+            caption = if (!is.null(pd) && !is.null(pd$description)) pd$description else "",
+            img = b64l[[i]]
+          )
+        }
+      }
+      session$sendCustomMessage("downloadPDF",
+        list(content = html_report, figures = figs))
     })
 
     # Download as plain text file
@@ -3411,35 +3456,44 @@ ui <- fluidPage(
         }
       });
 
-      // Download report as PDF using html2pdf.js
+      // Download report as PDF. Text and tables render via html2pdf; each
+      // figure is appended as a native jsPDF image page. html2canvas paints
+      // images unreliably inside the shinylive iframe (blank figures), so
+      // the already-rendered PNG data URIs go straight into the PDF instead.
       Shiny.addCustomMessageHandler('downloadPDF', function(msg) {
-        // Use an iframe so the full HTML (with styles) renders correctly
-        var iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '800px';
-        iframe.style.height = '1200px';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        var doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(msg.content);
-        doc.close();
-        // Wait for content to render, then generate PDF
-        setTimeout(function() {
-          var opt = {
-            margin: [15, 15, 15, 15],
-            filename: 'analysis_report.pdf',
-            image: { type: 'png', quality: 1.0 },
-            html2canvas: { scale: 4, useCORS: true, letterRendering: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-          };
-          html2pdf().set(opt).from(doc.body).save().then(function() {
-            document.body.removeChild(iframe);
-          });
-        }, 500);
+        var opt = {
+          margin: [15, 15, 15, 15],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] }
+        };
+        html2pdf().set(opt).from(msg.content).toPdf().get('pdf').then(function(pdf) {
+          var figs = msg.figures || [];
+          if (figs.length && !Array.isArray(figs)) figs = [figs];
+          var pageW = pdf.internal.pageSize.getWidth();
+          var margin = 15;
+          var imgW = pageW - 2 * margin;
+          var imgH = imgW * 500 / 800;  // figures render at 800x500
+          for (var i = 0; i < figs.length; i++) {
+            pdf.addPage();
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Figure ' + (i + 1) + ': ' + (figs[i].title || ''), margin, 22);
+            try {
+              pdf.addImage(figs[i].img, 'PNG', margin, 28, imgW, imgH);
+            } catch (e) { /* skip unreadable image, keep the rest */ }
+            if (figs[i].caption) {
+              pdf.setFontSize(9);
+              pdf.setFont(undefined, 'normal');
+              pdf.setTextColor(100);
+              var lines = pdf.splitTextToSize(figs[i].caption, imgW);
+              pdf.text(lines, margin, 28 + imgH + 8);
+              pdf.setTextColor(0);
+            }
+          }
+          pdf.save('analysis_report.pdf');
+        });
       });
 
       // Download as plain text file
@@ -3629,7 +3683,7 @@ server <- function(input, output, session) {
     model_result = NULL,
     model_result_html = NULL,
     plots = NULL,
-    plot_base64 = NULL,
+    plot_base64_list = NULL,
     diagnostics_plot = NULL,
     diagnostics_plot_base64 = NULL,
     last_export = NULL,
